@@ -20,3 +20,6 @@
 - Settings sliders persist after reload
 - Changing difficulty sliders restarts level after unpausing
 - Master/SFX/ambience sliders affect sound levels
+- Touch UI appears on small screens
+- Right-bottom joystick, left-bottom dash/fly, right-top pause
+- Orientation change flips layout (portrait/landscape)

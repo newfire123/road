@@ -16,6 +16,7 @@ body {
 #game {
   border: 2px solid #2b2f3a;
   background: #1a1d26;
+  touch-action: none;
 }
 
 .settings-panel {
@@ -75,4 +76,105 @@ body {
   color: #8f97a7;
   font-size: 12px;
   text-align: center;
+}
+
+.touch-ui {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.touch-ui.active {
+  pointer-events: auto;
+}
+
+.touch-joystick {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 2px solid rgba(140, 150, 170, 0.6);
+  background: rgba(30, 36, 48, 0.6);
+}
+
+.touch-stick {
+  position: absolute;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: rgba(245, 211, 75, 0.9);
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.touch-actions {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.touch-btn {
+  pointer-events: auto;
+  border: none;
+  border-radius: 999px;
+  padding: 14px 18px;
+  background: rgba(47, 53, 69, 0.85);
+  color: #f5d34b;
+  font-size: 14px;
+}
+
+.touch-btn.action.active {
+  background: rgba(245, 211, 75, 0.95);
+  color: #1b1f2a;
+}
+
+.touch-btn.pause {
+  padding: 10px 12px;
+  font-size: 16px;
+  background: rgba(25, 28, 38, 0.8);
+  color: #f0f0f0;
+}
+
+.touch-ui.portrait .touch-joystick {
+  right: 18px;
+  bottom: 18px;
+}
+
+.touch-ui.portrait .touch-actions {
+  left: 18px;
+  bottom: 18px;
+}
+
+.touch-ui.portrait .touch-btn.pause {
+  right: 18px;
+  top: 18px;
+  position: absolute;
+}
+
+.touch-ui.landscape .touch-joystick {
+  right: 26px;
+  bottom: 26px;
+}
+
+.touch-ui.landscape .touch-actions {
+  left: 26px;
+  bottom: 26px;
+}
+
+.touch-ui.landscape .touch-btn.pause {
+  right: 26px;
+  top: 18px;
+  position: absolute;
+}
+
+@media (max-width: 900px) {
+  .touch-ui {
+    display: block;
+  }
+  .touch-ui.active {
+    display: block;
+  }
 }

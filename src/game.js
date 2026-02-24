@@ -6,6 +6,7 @@ import { updateVehicle } from './entities.js';
 import { aabbIntersects } from './collision.js';
 import { clearScreen, drawCoin, drawDashBar, drawPixelRect, drawStaminaBar, drawText } from './renderer.js';
 import { normalizeSettings } from './settings.js';
+import { mergeInput } from './touch.js';
 
 const SAFE_ZONE_HEIGHT = 60;
 const AIR_MONSTER_SIZE = 16;
@@ -41,6 +42,7 @@ export class Game {
     this.coinsCollected = 0;
     this.audio = null;
     this.settings = normalizeSettings();
+    this.touchState = null;
   }
 
   setKeys(keys) {
@@ -53,6 +55,10 @@ export class Game {
 
   setSettings(settings) {
     this.settings = normalizeSettings(settings);
+  }
+
+  setTouchState(touchState) {
+    this.touchState = touchState;
   }
 
   wasPressed(code) {
@@ -200,6 +206,10 @@ export class Game {
         this.state = 'play';
         this.audio?.playSfx('ui');
       }
+      if (this.touchState?.pausePressed) {
+        this.state = 'play';
+        this.audio?.playSfx('ui');
+      }
       this.syncKeys();
       return;
     }
@@ -242,18 +252,22 @@ export class Game {
       return;
     }
 
-    if (pressedPause) {
+    if (pressedPause || this.touchState?.pausePressed) {
       this.state = 'pause';
       this.audio?.playSfx('ui');
       this.syncKeys();
       return;
     }
 
-    const move = inputVector(this.keys);
-    if (pressedDash) {
+    const keyMove = inputVector(this.keys);
+    const move = mergeInput(keyMove, this.touchState?.dir);
+    const dashPressed = pressedDash || this.touchState?.dashPressed;
+    const flyPressed = pressedFlight || this.touchState?.flyPressed;
+
+    if (dashPressed) {
       tryStartDash(this.player, move);
     }
-    toggleFlight(this.player, pressedFlight);
+    toggleFlight(this.player, flyPressed);
 
     updateDash(this.player, dt);
     updateStamina(this.player, dt, {

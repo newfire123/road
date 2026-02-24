@@ -809,6 +809,14 @@ var CrossRoad = (() => {
     }
   };
 
+  // src/mobile.js
+  function isMobileWidth(width, threshold = 900) {
+    return width < threshold;
+  }
+  function shouldShowTouchUI(width) {
+    return isMobileWidth(width);
+  }
+
   // src/main.js
   var canvas = document.getElementById("game");
   var ctx = canvas.getContext("2d");
@@ -915,6 +923,7 @@ var CrossRoad = (() => {
   var touchStick = document.getElementById("touch-stick");
   var touchDash = document.getElementById("touch-dash");
   var touchFly = document.getElementById("touch-fly");
+  var mobileStart = document.getElementById("mobile-start");
   var touchState = {
     dir: { x: 0, y: 0, active: false },
     dashPressed: false,
@@ -922,16 +931,6 @@ var CrossRoad = (() => {
     pausePressed: false
   };
   game.setTouchState(touchState);
-  function setTouchUiActive(active) {
-    if (!touchUi) return;
-    if (active) {
-      touchUi.classList.add("active");
-      touchUi.setAttribute("aria-hidden", "false");
-    } else {
-      touchUi.classList.remove("active");
-      touchUi.setAttribute("aria-hidden", "true");
-    }
-  }
   function applyOrientationClass() {
     if (!touchUi) return;
     const portrait = window.innerHeight >= window.innerWidth;
@@ -941,8 +940,18 @@ var CrossRoad = (() => {
   applyOrientationClass();
   window.addEventListener("resize", applyOrientationClass);
   window.addEventListener("orientationchange", applyOrientationClass);
-  setTouchUiActive(window.innerWidth < 900);
-  window.addEventListener("resize", () => setTouchUiActive(window.innerWidth < 900));
+  function updateMobileUi() {
+    const isMobile = shouldShowTouchUI(window.innerWidth);
+    if (touchUi) {
+      touchUi.classList.toggle("active", isMobile);
+      touchUi.setAttribute("aria-hidden", isMobile ? "false" : "true");
+    }
+    if (mobileStart) {
+      mobileStart.classList.toggle("active", isMobile);
+    }
+  }
+  updateMobileUi();
+  window.addEventListener("resize", updateMobileUi);
   var joystickPointerId = null;
   var joystickCenter = { x: 0, y: 0 };
   var joystickRadius = 50;
@@ -971,6 +980,7 @@ var CrossRoad = (() => {
     });
     touchJoystick.addEventListener("pointermove", (event) => {
       if (joystickPointerId !== event.pointerId) return;
+      event.preventDefault();
       const dx = event.clientX - joystickCenter.x;
       const dy = event.clientY - joystickCenter.y;
       const dir = toDirection(dx, dy, 12);
@@ -979,6 +989,7 @@ var CrossRoad = (() => {
     });
     const endJoystick = (event) => {
       if (joystickPointerId !== event.pointerId) return;
+      event.preventDefault();
       joystickPointerId = null;
       touchState.dir = { x: 0, y: 0, active: false };
       resetStickVisual();
@@ -994,7 +1005,8 @@ var CrossRoad = (() => {
       touchState[key] = true;
       button.classList.add("active");
     });
-    const release = () => {
+    const release = (event) => {
+      if (event) event.preventDefault();
       touchState[key] = false;
       button.classList.remove("active");
     };
@@ -1011,6 +1023,14 @@ var CrossRoad = (() => {
       setTimeout(() => {
         touchState.pausePressed = false;
       }, 120);
+    });
+  }
+  if (mobileStart) {
+    mobileStart.addEventListener("click", () => {
+      if (game.state !== "title") return;
+      game.startLevel(1);
+      game.state = "play";
+      audio.playSfx("ui");
     });
   }
   var last = performance.now();
@@ -1033,6 +1053,9 @@ var CrossRoad = (() => {
           game.startLevel(game.levelIndex);
           settingsDirty = false;
         }
+      }
+      if (mobileStart) {
+        mobileStart.classList.toggle("active", shouldShowTouchUI(window.innerWidth) && game.state === "title");
       }
       lastState = game.state;
     }

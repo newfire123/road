@@ -402,6 +402,23 @@ var CrossRoad = (() => {
     storage.setItem(key, JSON.stringify(normalizeSettings(settings2)));
   }
 
+  // src/touch.js
+  function normalizeStick(dx, dy) {
+    const len = Math.hypot(dx, dy) || 1;
+    const x = dx / len;
+    const y = dy / len;
+    return { x: Math.max(-1, Math.min(1, x)), y: Math.max(-1, Math.min(1, y)) };
+  }
+  function toDirection(dx, dy, deadZone = 0.2) {
+    const len = Math.hypot(dx, dy);
+    if (len < deadZone) return { x: 0, y: 0 };
+    return normalizeStick(dx, dy);
+  }
+  function mergeInput(keyDir, touchDir) {
+    if (touchDir?.active) return { x: touchDir.x, y: touchDir.y };
+    return keyDir;
+  }
+
   // src/game.js
   var SAFE_ZONE_HEIGHT = 60;
   var AIR_MONSTER_SIZE = 16;
@@ -432,6 +449,7 @@ var CrossRoad = (() => {
       this.coinsCollected = 0;
       this.audio = null;
       this.settings = normalizeSettings();
+      this.touchState = null;
     }
     setKeys(keys2) {
       this.keys = keys2;
@@ -441,6 +459,9 @@ var CrossRoad = (() => {
     }
     setSettings(settings2) {
       this.settings = normalizeSettings(settings2);
+    }
+    setTouchState(touchState2) {
+      this.touchState = touchState2;
     }
     wasPressed(code) {
       return Boolean(this.keys[code]) && !this.lastKeys[code];
@@ -573,6 +594,10 @@ var CrossRoad = (() => {
           this.state = "play";
           this.audio?.playSfx("ui");
         }
+        if (this.touchState?.pausePressed) {
+          this.state = "play";
+          this.audio?.playSfx("ui");
+        }
         this.syncKeys();
         return;
       }
@@ -610,17 +635,20 @@ var CrossRoad = (() => {
         this.syncKeys();
         return;
       }
-      if (pressedPause) {
+      if (pressedPause || this.touchState?.pausePressed) {
         this.state = "pause";
         this.audio?.playSfx("ui");
         this.syncKeys();
         return;
       }
-      const move = inputVector(this.keys);
-      if (pressedDash) {
+      const keyMove = inputVector(this.keys);
+      const move = mergeInput(keyMove, this.touchState?.dir);
+      const dashPressed = pressedDash || this.touchState?.dashPressed;
+      const flyPressed = pressedFlight || this.touchState?.flyPressed;
+      if (dashPressed) {
         tryStartDash(this.player, move);
       }
-      toggleFlight(this.player, pressedFlight);
+      toggleFlight(this.player, flyPressed);
       updateDash(this.player, dt);
       updateStamina(this.player, dt, {
         flyDrainPerSec: this.level.flyDrainPerSec,
@@ -881,12 +909,117 @@ var CrossRoad = (() => {
     }
   }
   syncSettingsUI();
+  var touchUi = document.getElementById("touch-ui");
+  var touchPause = document.getElementById("touch-pause");
+  var touchJoystick = document.getElementById("touch-joystick");
+  var touchStick = document.getElementById("touch-stick");
+  var touchDash = document.getElementById("touch-dash");
+  var touchFly = document.getElementById("touch-fly");
+  var touchState = {
+    dir: { x: 0, y: 0, active: false },
+    dashPressed: false,
+    flyPressed: false,
+    pausePressed: false
+  };
+  game.setTouchState(touchState);
+  function setTouchUiActive(active) {
+    if (!touchUi) return;
+    if (active) {
+      touchUi.classList.add("active");
+      touchUi.setAttribute("aria-hidden", "false");
+    } else {
+      touchUi.classList.remove("active");
+      touchUi.setAttribute("aria-hidden", "true");
+    }
+  }
+  function applyOrientationClass() {
+    if (!touchUi) return;
+    const portrait = window.innerHeight >= window.innerWidth;
+    touchUi.classList.toggle("portrait", portrait);
+    touchUi.classList.toggle("landscape", !portrait);
+  }
+  applyOrientationClass();
+  window.addEventListener("resize", applyOrientationClass);
+  window.addEventListener("orientationchange", applyOrientationClass);
+  setTouchUiActive(window.innerWidth < 900);
+  window.addEventListener("resize", () => setTouchUiActive(window.innerWidth < 900));
+  var joystickPointerId = null;
+  var joystickCenter = { x: 0, y: 0 };
+  var joystickRadius = 50;
+  function updateStickVisual(dx, dy) {
+    if (!touchStick) return;
+    const max = joystickRadius;
+    const clampedX = Math.max(-max, Math.min(max, dx));
+    const clampedY = Math.max(-max, Math.min(max, dy));
+    touchStick.style.transform = `translate(${clampedX}px, ${clampedY}px)`;
+  }
+  function resetStickVisual() {
+    if (!touchStick) return;
+    touchStick.style.transform = "translate(0px, 0px)";
+  }
+  if (touchJoystick) {
+    touchJoystick.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      joystickPointerId = event.pointerId;
+      const rect = touchJoystick.getBoundingClientRect();
+      joystickCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+      const dx = event.clientX - joystickCenter.x;
+      const dy = event.clientY - joystickCenter.y;
+      const dir = toDirection(dx, dy, 12);
+      touchState.dir = { ...dir, active: true };
+      updateStickVisual(dir.x * joystickRadius, dir.y * joystickRadius);
+    });
+    touchJoystick.addEventListener("pointermove", (event) => {
+      if (joystickPointerId !== event.pointerId) return;
+      const dx = event.clientX - joystickCenter.x;
+      const dy = event.clientY - joystickCenter.y;
+      const dir = toDirection(dx, dy, 12);
+      touchState.dir = { ...dir, active: true };
+      updateStickVisual(dir.x * joystickRadius, dir.y * joystickRadius);
+    });
+    const endJoystick = (event) => {
+      if (joystickPointerId !== event.pointerId) return;
+      joystickPointerId = null;
+      touchState.dir = { x: 0, y: 0, active: false };
+      resetStickVisual();
+    };
+    touchJoystick.addEventListener("pointerup", endJoystick);
+    touchJoystick.addEventListener("pointercancel", endJoystick);
+    touchJoystick.addEventListener("pointerleave", endJoystick);
+  }
+  function bindPressButton(button, key) {
+    if (!button) return;
+    button.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      touchState[key] = true;
+      button.classList.add("active");
+    });
+    const release = () => {
+      touchState[key] = false;
+      button.classList.remove("active");
+    };
+    button.addEventListener("pointerup", release);
+    button.addEventListener("pointercancel", release);
+    button.addEventListener("pointerleave", release);
+  }
+  bindPressButton(touchDash, "dashPressed");
+  bindPressButton(touchFly, "flyPressed");
+  if (touchPause) {
+    touchPause.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      touchState.pausePressed = true;
+      setTimeout(() => {
+        touchState.pausePressed = false;
+      }, 120);
+    });
+  }
   var last = performance.now();
   var lastState = game.state;
   function loop(now) {
     const dt = Math.min((now - last) / 1e3, 0.05);
     last = now;
     game.setKeys(keys);
+    game.setTouchState(touchState);
     game.update(dt);
     game.render();
     if (game.state !== lastState) {

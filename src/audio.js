@@ -70,6 +70,9 @@ export class AudioManager {
   }
 
   ensureUnlocked() {
+    if (!this.initialized) {
+      this.init();
+    }
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume();
     }
@@ -103,6 +106,9 @@ export class AudioManager {
   }
 
   playSfx(name) {
+    if (!this.initialized) {
+      this.init();
+    }
     const pool = this.sfxPools.get(name);
     if (!pool || pool.length === 0) return;
     const idx = this.sfxIndex.get(name) ?? 0;
@@ -114,6 +120,9 @@ export class AudioManager {
   }
 
   playAmbience(name) {
+    if (!this.initialized) {
+      this.init();
+    }
     const el = this.elements.get(name);
     if (!el) return;
     this.ensureUnlocked();

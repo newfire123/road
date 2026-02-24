@@ -63,6 +63,9 @@ var CrossRoad = (() => {
       this.sfxIndex.set(name, 0);
     }
     ensureUnlocked() {
+      if (!this.initialized) {
+        this.init();
+      }
       if (this.ctx && this.ctx.state === "suspended") {
         this.ctx.resume();
       }
@@ -92,6 +95,9 @@ var CrossRoad = (() => {
       }
     }
     playSfx(name) {
+      if (!this.initialized) {
+        this.init();
+      }
       const pool = this.sfxPools.get(name);
       if (!pool || pool.length === 0) return;
       const idx = this.sfxIndex.get(name) ?? 0;
@@ -102,6 +108,9 @@ var CrossRoad = (() => {
       el.play();
     }
     playAmbience(name) {
+      if (!this.initialized) {
+        this.init();
+      }
       const el = this.elements.get(name);
       if (!el) return;
       this.ensureUnlocked();

@@ -9,8 +9,10 @@
 - Stamina recovers only when not flying or dashing
 - Flying ignores vehicle and ground monster collisions but still dies to air monsters
 - Collision with vehicle or monster triggers fail screen (when not flying)
-- Reaching far side triggers win and next level
-- Level 9 win shows final completion screen
+- Coins spawn 15 per level in road area only
+- Need 9 coins + reach far side to win
+- Reaching far side with <9 coins does not win
+- Coins cannot be collected while flying
 - Air monsters activate only when flying
-- Vehicles include variable length and periodic speed changes
+- Vehicles include variable length, periodic speed changes, and occasional reversal
 - Difficulty scales across 9 levels

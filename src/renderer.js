@@ -28,3 +28,9 @@ export function drawDashBar(ctx, x, y, width, height, ratio) {
   ctx.strokeStyle = '#2f3545';
   ctx.strokeRect(x, y, width, height);
 }
+
+export function drawCoin(ctx, x, y, r) {
+  drawPixelRect(ctx, x - r, y - r, r * 2, r * 2, '#f5d34b');
+  drawPixelRect(ctx, x - r + 2, y - r + 2, r * 2 - 4, r * 2 - 4, '#e2b93f');
+  drawPixelRect(ctx, x - 1, y - 1, 2, 2, '#fff2a6');
+}

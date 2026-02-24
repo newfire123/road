@@ -3,7 +3,8 @@ import { createPlayer, toggleFlight, tryStartDash, updateDash, updateStamina } f
 import { inputVector } from './input.js';
 import { updateVehicle } from './entities.js';
 import { aabbIntersects } from './collision.js';
-import { clearScreen, drawDashBar, drawPixelRect, drawStaminaBar, drawText } from './renderer.js';
+import { collectCoin, shouldCollectCoin } from './coins.js';
+import { clearScreen, drawCoin, drawDashBar, drawPixelRect, drawStaminaBar, drawText } from './renderer.js';
 
 const SAFE_ZONE_HEIGHT = 60;
 const AIR_MONSTER_SIZE = 16;
@@ -11,6 +12,7 @@ const GROUND_MONSTER_SIZE = 18;
 const VEHICLE_HEIGHT_RATIO = 0.6;
 const DASH_BAR_WIDTH = 90;
 const DASH_BAR_HEIGHT = 8;
+const COIN_RADIUS = 6;
 
 function randomBetween(min, max) {
   return min + Math.random() * (max - min);
@@ -34,6 +36,8 @@ export class Game {
     this.vehicles = [];
     this.groundMonsters = [];
     this.airMonsters = [];
+    this.coins = [];
+    this.coinsCollected = 0;
   }
 
   setKeys(keys) {
@@ -58,6 +62,8 @@ export class Game {
     this.vehicles = this.buildVehicles();
     this.groundMonsters = this.buildGroundMonsters();
     this.airMonsters = this.buildAirMonsters();
+    this.coins = this.buildCoins();
+    this.coinsCollected = 0;
   }
 
   buildVehicles() {
@@ -68,12 +74,13 @@ export class Game {
 
     return this.level.lanes.flatMap((lane, i) => {
       const y = roadTop + i * laneHeight + laneHeight * (1 - VEHICLE_HEIGHT_RATIO) / 2;
-      return Array.from({ length: lane.vehicleCount }, (_, v) => {
+      const vehicleCount = Math.min(8, this.level.vehicleCountPerLane + (i % 2));
+      return Array.from({ length: vehicleCount }, (_, v) => {
         const [minLen, maxLen] = this.level.vehicleLengthRange;
         const lengthScale = randomBetween(minLen, maxLen);
         const w = 42 * lengthScale;
         const h = laneHeight * VEHICLE_HEIGHT_RATIO;
-        const x = (v * (this.width / lane.vehicleCount)) % this.width;
+        const x = (v * (this.width / vehicleCount)) % this.width;
         const isVariable = Math.random() < this.level.variableSpeedChance;
         const fastSpeed = lane.speed * 1.35;
         const slowSpeed = lane.speed * 0.75;
@@ -91,10 +98,41 @@ export class Game {
           slowDuration: 1.5,
           phase: 'fast',
           phaseTime: Math.random() * 1.5,
+          reverseChance: this.level.reverseChance,
+          reverseCooldown: 1 + Math.random() * 2,
           color: lane.direction === 1 ? '#f8575d' : '#4bc0ff',
         };
       });
     });
+  }
+
+  buildCoins() {
+    const roadTop = SAFE_ZONE_HEIGHT;
+    const roadBottom = this.height - SAFE_ZONE_HEIGHT;
+    const padding = 14;
+    const minDist = 18 + this.level.coinSpread * 24;
+    const coins = [];
+
+    let attempts = 0;
+    while (coins.length < this.level.coinCount && attempts < this.level.coinCount * 30) {
+      attempts += 1;
+      const x = randomBetween(padding, this.width - padding);
+      const y = randomBetween(roadTop + padding, roadBottom - padding);
+      const tooClose = coins.some((c) => Math.hypot(c.x - x, c.y - y) < minDist);
+      if (tooClose) continue;
+      coins.push({ x, y, r: COIN_RADIUS, collected: false });
+    }
+
+    while (coins.length < this.level.coinCount) {
+      coins.push({
+        x: randomBetween(padding, this.width - padding),
+        y: randomBetween(roadTop + padding, roadBottom - padding),
+        r: COIN_RADIUS,
+        collected: false,
+      });
+    }
+
+    return coins;
   }
 
   buildGroundMonsters() {
@@ -246,8 +284,14 @@ export class Game {
       return;
     }
 
+    for (const coin of this.coins) {
+      if (coin.collected) continue;
+      const canCollect = shouldCollectCoin(this.player, coin);
+      this.coinsCollected = collectCoin(this.coinsCollected, this.level.coinTarget, coin, canCollect);
+    }
+
     const roadTop = SAFE_ZONE_HEIGHT;
-    if (this.player.y <= roadTop - this.player.h / 2) {
+    if (this.player.y <= roadTop - this.player.h / 2 && this.coinsCollected >= this.level.coinTarget) {
       this.state = 'win';
     }
 
@@ -331,6 +375,11 @@ export class Game {
       drawPixelRect(this.ctx, monster.x + 2, monster.y + 2, 4, 4, '#a4c2ff');
     }
 
+    for (const coin of this.coins) {
+      if (coin.collected) continue;
+      drawCoin(this.ctx, coin.x, coin.y, coin.r);
+    }
+
     const staminaRatio = this.player.stamina / this.player.maxStamina;
     drawStaminaBar(this.ctx, 20, 16, 140, 16, staminaRatio);
     if (this.player.dashTimeRemaining > 0) {
@@ -338,6 +387,7 @@ export class Game {
       drawDashBar(this.ctx, 20, 36, DASH_BAR_WIDTH, DASH_BAR_HEIGHT, dashRatio);
     }
     drawText(this.ctx, `关卡 ${this.levelIndex}/9`, this.width - 80, 22, 14, '#c7ccd8', 'right');
+    drawText(this.ctx, `金币 ${this.coinsCollected}/${this.level.coinTarget}`, this.width - 80, 40, 12, '#f2d45c', 'right');
     drawText(this.ctx, '方向键移动 | D冲刺 | F飞行', this.width / 2, this.height - 18, 12, '#9aa0af');
   }
 }

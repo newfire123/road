@@ -7,9 +7,197 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <div id="settings-panel" class="settings-panel" aria-hidden="true">
+      <div class="settings-card">
+        <div class="settings-title">设置</div>
+        <div class="settings-section">音量</div>
+        <label class="settings-row">
+          <span>总音量</span>
+          <input id="masterVolume" type="range" min="0" max="1" step="0.01" />
+          <span id="masterVolumeValue" class="value"></span>
+        </label>
+        <label class="settings-row">
+          <span>音效</span>
+          <input id="sfxVolume" type="range" min="0" max="1" step="0.01" />
+          <span id="sfxVolumeValue" class="value"></span>
+        </label>
+        <label class="settings-row">
+          <span>环境音</span>
+          <input id="ambienceVolume" type="range" min="0" max="1" step="0.01" />
+          <span id="ambienceVolumeValue" class="value"></span>
+        </label>
+
+        <div class="settings-section">难度</div>
+        <label class="settings-row">
+          <span>车辆数量</span>
+          <input id="vehicleCountScale" type="range" min="0.6" max="1.4" step="0.05" />
+          <span id="vehicleCountScaleValue" class="value"></span>
+        </label>
+        <label class="settings-row">
+          <span>车速倍率</span>
+          <input id="speedScale" type="range" min="0.6" max="1.6" step="0.05" />
+          <span id="speedScaleValue" class="value"></span>
+        </label>
+        <label class="settings-row">
+          <span>反向概率</span>
+          <input id="reverseChance" type="range" min="0" max="0.2" step="0.01" />
+          <span id="reverseChanceValue" class="value"></span>
+        </label>
+        <label class="settings-row">
+          <span>车长最小</span>
+          <input id="lengthMin" type="range" min="0.5" max="1.0" step="0.05" />
+          <span id="lengthMinValue" class="value"></span>
+        </label>
+        <label class="settings-row">
+          <span>车长最大</span>
+          <input id="lengthMax" type="range" min="1.0" max="1.6" step="0.05" />
+          <span id="lengthMaxValue" class="value"></span>
+        </label>
+
+        <div class="settings-hint">按 空格 继续游戏</div>
+      </div>
+    </div>
+
     <canvas id="game" width="960" height="540"></canvas>
     <script>
 var CrossRoad = (() => {
+  // src/audio.js
+  function clamp(value, min = 0, max = 1) {
+    return Math.max(min, Math.min(max, value));
+  }
+  function computeVolume(master, channel) {
+    return clamp(master * channel);
+  }
+  var AudioManager = class {
+    constructor(sounds, settings2) {
+      this.sounds = sounds;
+      this.settings = settings2;
+      this.ctx = null;
+      this.masterGain = null;
+      this.sfxGain = null;
+      this.ambienceGain = null;
+      this.buffers = /* @__PURE__ */ new Map();
+      this.elements = /* @__PURE__ */ new Map();
+      this.sfxPools = /* @__PURE__ */ new Map();
+      this.sfxIndex = /* @__PURE__ */ new Map();
+    }
+    init() {
+      if (this.ctx) return;
+      if (!window.AudioContext && !window.webkitAudioContext) return;
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.masterGain = this.ctx.createGain();
+      this.sfxGain = this.ctx.createGain();
+      this.ambienceGain = this.ctx.createGain();
+      this.sfxGain.connect(this.masterGain);
+      this.ambienceGain.connect(this.masterGain);
+      this.masterGain.connect(this.ctx.destination);
+      for (const [name, sound] of Object.entries(this.sounds)) {
+        if (sound.type === "sfx") {
+          this.createSfxPool(name, sound.src);
+        } else {
+          this.createElement(name, sound.src, this.ambienceGain, true);
+        }
+      }
+      this.updateVolumes(this.settings);
+    }
+    createElement(name, src, gainNode, loop2 = false) {
+      const el = new Audio(src);
+      el.preload = "auto";
+      el.loop = loop2;
+      this.elements.set(name, el);
+      if (this.ctx) {
+        const node = this.ctx.createMediaElementSource(el);
+        node.connect(gainNode);
+      }
+      return el;
+    }
+    createSfxPool(name, src) {
+      const poolSize = 4;
+      const pool = [];
+      for (let i = 0; i < poolSize; i += 1) {
+        const el = this.createElement(`${name}_${i}`, src, this.sfxGain, false);
+        pool.push(el);
+      }
+      this.sfxPools.set(name, pool);
+      this.sfxIndex.set(name, 0);
+    }
+    ensureUnlocked() {
+      if (this.ctx && this.ctx.state === "suspended") {
+        this.ctx.resume();
+      }
+    }
+    updateVolumes(settings2) {
+      this.settings = settings2;
+      const master = computeVolume(settings2.masterVolume, 1);
+      const sfx = computeVolume(settings2.masterVolume, settings2.sfxVolume);
+      const ambience = computeVolume(settings2.masterVolume, settings2.ambienceVolume);
+      if (this.masterGain) {
+        this.masterGain.gain.value = master;
+      }
+      if (this.sfxGain) {
+        this.sfxGain.gain.value = sfx;
+      }
+      if (this.ambienceGain) {
+        this.ambienceGain.gain.value = ambience;
+      }
+      for (const pool of this.sfxPools.values()) {
+        for (const el of pool) {
+          el.volume = sfx;
+        }
+      }
+      for (const [name, el] of this.elements.entries()) {
+        if (name.includes("_")) continue;
+        el.volume = ambience;
+      }
+    }
+    playSfx(name) {
+      const pool = this.sfxPools.get(name);
+      if (!pool || pool.length === 0) return;
+      const idx = this.sfxIndex.get(name) ?? 0;
+      const el = pool[idx];
+      this.sfxIndex.set(name, (idx + 1) % pool.length);
+      this.ensureUnlocked();
+      el.currentTime = 0;
+      el.play();
+    }
+    playAmbience(name) {
+      const el = this.elements.get(name);
+      if (!el) return;
+      this.ensureUnlocked();
+      if (el.paused) {
+        el.play();
+      }
+    }
+    stopAmbience(name) {
+      const el = this.elements.get(name);
+      if (!el) return;
+      el.pause();
+      el.currentTime = 0;
+    }
+  };
+
+  // src/collision.js
+  function aabbIntersects(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
+  // src/coins.js
+  function shouldCollectCoin(player, coin) {
+    if (player.isFlying) return false;
+    const box = { x: coin.x - coin.r, y: coin.y - coin.r, w: coin.r * 2, h: coin.r * 2 };
+    return aabbIntersects(player, box);
+  }
+  function collectCoin(current, target, coin, canCollect) {
+    if (!canCollect) return current;
+    if (coin.collected) return current;
+    if (current >= target) return current;
+    coin.collected = true;
+    return current + 1;
+  }
+  function canWin(coinCount, target, playerY, roadTop, playerH) {
+    return coinCount >= target && playerY <= roadTop - playerH / 2;
+  }
+
   // src/level-gen.js
   function generateLevel(level) {
     const clamped = Math.max(1, Math.min(level, 9));
@@ -130,25 +318,6 @@ var CrossRoad = (() => {
     }
   }
 
-  // src/collision.js
-  function aabbIntersects(a, b) {
-    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-  }
-
-  // src/coins.js
-  function shouldCollectCoin(player, coin) {
-    if (player.isFlying) return false;
-    const box = { x: coin.x - coin.r, y: coin.y - coin.r, w: coin.r * 2, h: coin.r * 2 };
-    return aabbIntersects(player, box);
-  }
-  function collectCoin(current, target, coin, canCollect) {
-    if (!canCollect) return current;
-    if (coin.collected) return current;
-    if (current >= target) return current;
-    coin.collected = true;
-    return current + 1;
-  }
-
   // src/renderer.js
   function clearScreen(ctx2, width, height) {
     ctx2.clearRect(0, 0, width, height);
@@ -182,6 +351,73 @@ var CrossRoad = (() => {
     drawPixelRect(ctx2, x - 1, y - 1, 2, 2, "#fff2a6");
   }
 
+  // src/settings.js
+  var defaultSettings = {
+    masterVolume: 0.8,
+    sfxVolume: 0.8,
+    ambienceVolume: 0.5,
+    vehicleCountScale: 1,
+    vehicleCountScaleMin: 0.6,
+    vehicleCountScaleMax: 1.4,
+    speedScale: 1,
+    speedScaleMin: 0.6,
+    speedScaleMax: 1.6,
+    reverseChance: 0.12,
+    reverseChanceMin: 0,
+    reverseChanceMax: 0.2,
+    lengthMin: 0.7,
+    lengthMinMin: 0.5,
+    lengthMinMax: 1,
+    lengthMax: 1.3,
+    lengthMaxMin: 1,
+    lengthMaxMax: 1.6
+  };
+  function clamp2(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+  function normalizeSettings(input = {}) {
+    const merged = { ...defaultSettings, ...input };
+    const lengthMin = clamp2(merged.lengthMin, defaultSettings.lengthMinMin, defaultSettings.lengthMinMax);
+    const lengthMaxRaw = clamp2(
+      merged.lengthMax,
+      defaultSettings.lengthMaxMin,
+      defaultSettings.lengthMaxMax
+    );
+    const lengthMax = Math.max(lengthMin, lengthMaxRaw);
+    return {
+      ...merged,
+      masterVolume: clamp2(merged.masterVolume, 0, 1),
+      sfxVolume: clamp2(merged.sfxVolume, 0, 1),
+      ambienceVolume: clamp2(merged.ambienceVolume, 0, 1),
+      vehicleCountScale: clamp2(
+        merged.vehicleCountScale,
+        defaultSettings.vehicleCountScaleMin,
+        defaultSettings.vehicleCountScaleMax
+      ),
+      speedScale: clamp2(merged.speedScale, defaultSettings.speedScaleMin, defaultSettings.speedScaleMax),
+      reverseChance: clamp2(
+        merged.reverseChance,
+        defaultSettings.reverseChanceMin,
+        defaultSettings.reverseChanceMax
+      ),
+      lengthMin,
+      lengthMax
+    };
+  }
+  function loadSettings(storage, key = "crossRoadSettings") {
+    try {
+      const raw = storage?.getItem?.(key);
+      if (!raw) return normalizeSettings();
+      return normalizeSettings(JSON.parse(raw));
+    } catch {
+      return normalizeSettings();
+    }
+  }
+  function saveSettings(storage, settings2, key = "crossRoadSettings") {
+    if (!storage?.setItem) return;
+    storage.setItem(key, JSON.stringify(normalizeSettings(settings2)));
+  }
+
   // src/game.js
   var SAFE_ZONE_HEIGHT = 60;
   var AIR_MONSTER_SIZE = 16;
@@ -210,9 +446,17 @@ var CrossRoad = (() => {
       this.airMonsters = [];
       this.coins = [];
       this.coinsCollected = 0;
+      this.audio = null;
+      this.settings = normalizeSettings();
     }
     setKeys(keys2) {
       this.keys = keys2;
+    }
+    setAudio(audio2) {
+      this.audio = audio2;
+    }
+    setSettings(settings2) {
+      this.settings = normalizeSettings(settings2);
     }
     wasPressed(code) {
       return Boolean(this.keys[code]) && !this.lastKeys[code];
@@ -239,23 +483,26 @@ var CrossRoad = (() => {
       const laneHeight = roadHeight / this.level.lanes.length;
       return this.level.lanes.flatMap((lane, i) => {
         const y = roadTop + i * laneHeight + laneHeight * (1 - VEHICLE_HEIGHT_RATIO) / 2;
-        const vehicleCount = Math.min(8, this.level.vehicleCountPerLane + i % 2);
+        const scaledCount = Math.round(this.level.vehicleCountPerLane * this.settings.vehicleCountScale);
+        const vehicleCount = Math.max(5, Math.min(8, scaledCount + i % 2));
         return Array.from({ length: vehicleCount }, (_, v) => {
-          const [minLen, maxLen] = this.level.vehicleLengthRange;
-          const lengthScale = randomBetween(minLen, maxLen);
+          const lengthMin = this.settings.lengthMin;
+          const lengthMax = this.settings.lengthMax;
+          const lengthScale = randomBetween(lengthMin, lengthMax);
           const w = 42 * lengthScale;
           const h = laneHeight * VEHICLE_HEIGHT_RATIO;
           const x = v * (this.width / vehicleCount) % this.width;
           const isVariable = Math.random() < this.level.variableSpeedChance;
-          const fastSpeed = lane.speed * 1.35;
-          const slowSpeed = lane.speed * 0.75;
+          const baseSpeed = lane.speed * this.settings.speedScale;
+          const fastSpeed = baseSpeed * 1.35;
+          const slowSpeed = baseSpeed * 0.75;
           return {
             x,
             y,
             w,
             h,
             dir: lane.direction,
-            speed: lane.speed,
+            speed: baseSpeed,
             variable: isVariable,
             fastSpeed,
             slowSpeed,
@@ -263,7 +510,7 @@ var CrossRoad = (() => {
             slowDuration: 1.5,
             phase: "fast",
             phaseTime: Math.random() * 1.5,
-            reverseChance: this.level.reverseChance,
+            reverseChance: this.settings.reverseChance,
             reverseCooldown: 1 + Math.random() * 2,
             color: lane.direction === 1 ? "#f8575d" : "#4bc0ff"
           };
@@ -327,10 +574,20 @@ var CrossRoad = (() => {
       const pressedEnter = this.wasPressed("Enter");
       const pressedDash = this.wasPressed("KeyD");
       const pressedFlight = this.wasPressed("KeyF");
+      const pressedPause = this.wasPressed("Space");
       if (this.state === "title") {
         if (pressedEnter) {
           this.startLevel(1);
           this.state = "play";
+          this.audio?.playSfx("ui");
+        }
+        this.syncKeys();
+        return;
+      }
+      if (this.state === "pause") {
+        if (pressedPause) {
+          this.state = "play";
+          this.audio?.playSfx("ui");
         }
         this.syncKeys();
         return;
@@ -343,6 +600,7 @@ var CrossRoad = (() => {
             this.startLevel(this.levelIndex + 1);
             this.state = "play";
           }
+          this.audio?.playSfx("ui");
         }
         this.syncKeys();
         return;
@@ -350,6 +608,7 @@ var CrossRoad = (() => {
       if (this.state === "complete") {
         if (pressedEnter) {
           this.state = "title";
+          this.audio?.playSfx("ui");
         }
         this.syncKeys();
         return;
@@ -358,11 +617,18 @@ var CrossRoad = (() => {
         if (pressedEnter) {
           this.startLevel(this.levelIndex);
           this.state = "play";
+          this.audio?.playSfx("ui");
         }
         this.syncKeys();
         return;
       }
       if (this.state !== "play") {
+        this.syncKeys();
+        return;
+      }
+      if (pressedPause) {
+        this.state = "pause";
+        this.audio?.playSfx("ui");
         this.syncKeys();
         return;
       }
@@ -414,25 +680,33 @@ var CrossRoad = (() => {
       if (!this.player.isFlying) {
         if (this.vehicles.some((v) => aabbIntersects(playerBox, v))) {
           this.state = "fail";
+          this.audio?.playSfx("fail");
           return;
         }
         if (this.groundMonsters.some((m) => aabbIntersects(playerBox, m))) {
           this.state = "fail";
+          this.audio?.playSfx("fail");
           return;
         }
       }
       if (this.airMonsters.some((m) => m.active && aabbIntersects(playerBox, m))) {
         this.state = "fail";
+        this.audio?.playSfx("fail");
         return;
       }
       for (const coin of this.coins) {
         if (coin.collected) continue;
         const canCollect = shouldCollectCoin(this.player, coin);
+        const before = this.coinsCollected;
         this.coinsCollected = collectCoin(this.coinsCollected, this.level.coinTarget, coin, canCollect);
+        if (this.coinsCollected > before) {
+          this.audio?.playSfx("coin");
+        }
       }
       const roadTop = SAFE_ZONE_HEIGHT;
-      if (this.player.y <= roadTop - this.player.h / 2 && this.coinsCollected >= this.level.coinTarget) {
+      if (canWin(this.coinsCollected, this.level.coinTarget, this.player.y, roadTop, this.player.h)) {
         this.state = "win";
+        this.audio?.playSfx("success");
       }
       this.syncKeys();
     }
@@ -443,6 +717,10 @@ var CrossRoad = (() => {
         return;
       }
       this.renderWorld();
+      if (this.state === "pause") {
+        this.renderOverlay("\u5DF2\u6682\u505C", "\u6309 \u7A7A\u683C \u7EE7\u7EED");
+        return;
+      }
       if (this.state === "fail") {
         this.renderOverlay("\u5931\u8D25", "\u6309 Enter \u91CD\u6765");
         return;
@@ -508,6 +786,9 @@ var CrossRoad = (() => {
       drawText(this.ctx, `\u5173\u5361 ${this.levelIndex}/9`, this.width - 80, 22, 14, "#c7ccd8", "right");
       drawText(this.ctx, `\u91D1\u5E01 ${this.coinsCollected}/${this.level.coinTarget}`, this.width - 80, 40, 12, "#f2d45c", "right");
       drawText(this.ctx, "\u65B9\u5411\u952E\u79FB\u52A8 | D\u51B2\u523A | F\u98DE\u884C", this.width / 2, this.height - 18, 12, "#9aa0af");
+      if (this.player.y <= SAFE_ZONE_HEIGHT - this.player.h / 2 && this.coinsCollected < this.level.coinTarget) {
+        drawText(this.ctx, "\u91D1\u5E01\u4E0D\u8DB3", this.width / 2, SAFE_ZONE_HEIGHT + 10, 14, "#f5a45b");
+      }
     }
   };
 
@@ -515,6 +796,19 @@ var CrossRoad = (() => {
   var canvas = document.getElementById("game");
   var ctx = canvas.getContext("2d");
   var game = new Game(canvas, ctx);
+  var settings = loadSettings(localStorage);
+  game.setSettings(settings);
+  var audio = new AudioManager(
+    {
+      coin: { src: "assets/audio/coin.mp3", type: "sfx" },
+      ui: { src: "assets/audio/ui-click.mp3", type: "sfx" },
+      success: { src: "assets/audio/success.mp3", type: "sfx" },
+      fail: { src: "assets/audio/gameover.mp3", type: "sfx" },
+      traffic: { src: "assets/audio/traffic.ogg", type: "ambience" }
+    },
+    settings
+  );
+  game.setAudio(audio);
   var keys = {};
   window.addEventListener("keydown", (event) => {
     keys[event.code] = true;
@@ -522,13 +816,88 @@ var CrossRoad = (() => {
   window.addEventListener("keyup", (event) => {
     keys[event.code] = false;
   });
+  function unlockAudio() {
+    audio.init();
+    audio.ensureUnlocked();
+  }
+  window.addEventListener("pointerdown", unlockAudio, { once: true });
+  window.addEventListener("keydown", unlockAudio, { once: true });
+  var settingsPanel = document.getElementById("settings-panel");
+  var settingsDirty = false;
+  function updateSettingLabel(id, value, format = (v) => v.toFixed(2)) {
+    const label = document.getElementById(`${id}Value`);
+    if (label) label.textContent = format(value);
+  }
+  function bindSlider(id, key, format) {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.value = settings[key];
+    updateSettingLabel(id, settings[key], format);
+    input.addEventListener("input", () => {
+      settings = normalizeSettings({ ...settings, [key]: parseFloat(input.value) });
+      updateSettingLabel(id, settings[key], format);
+      saveSettings(localStorage, settings);
+      game.setSettings(settings);
+      audio.updateVolumes(settings);
+      if (key === "vehicleCountScale" || key === "speedScale" || key === "reverseChance" || key === "lengthMin" || key === "lengthMax") {
+        settingsDirty = true;
+      }
+      audio.playSfx("ui");
+    });
+  }
+  bindSlider("masterVolume", "masterVolume", (v) => Math.round(v * 100));
+  bindSlider("sfxVolume", "sfxVolume", (v) => Math.round(v * 100));
+  bindSlider("ambienceVolume", "ambienceVolume", (v) => Math.round(v * 100));
+  bindSlider("vehicleCountScale", "vehicleCountScale", (v) => v.toFixed(2));
+  bindSlider("speedScale", "speedScale", (v) => v.toFixed(2));
+  bindSlider("reverseChance", "reverseChance", (v) => v.toFixed(2));
+  bindSlider("lengthMin", "lengthMin", (v) => v.toFixed(2));
+  bindSlider("lengthMax", "lengthMax", (v) => v.toFixed(2));
+  function syncSettingsUI() {
+    settings = normalizeSettings(settings);
+    for (const key of [
+      "masterVolume",
+      "sfxVolume",
+      "ambienceVolume",
+      "vehicleCountScale",
+      "speedScale",
+      "reverseChance",
+      "lengthMin",
+      "lengthMax"
+    ]) {
+      const input = document.getElementById(key);
+      if (input) input.value = settings[key];
+      updateSettingLabel(key, settings[key], (v) => key.includes("Volume") ? Math.round(v * 100) : v.toFixed(2));
+    }
+  }
+  syncSettingsUI();
   var last = performance.now();
+  var lastState = game.state;
   function loop(now) {
     const dt = Math.min((now - last) / 1e3, 0.05);
     last = now;
     game.setKeys(keys);
     game.update(dt);
     game.render();
+    if (game.state !== lastState) {
+      if (game.state === "pause") {
+        settingsPanel.classList.add("open");
+        settingsPanel.setAttribute("aria-hidden", "false");
+      } else {
+        settingsPanel.classList.remove("open");
+        settingsPanel.setAttribute("aria-hidden", "true");
+        if (lastState === "pause" && settingsDirty) {
+          game.startLevel(game.levelIndex);
+          settingsDirty = false;
+        }
+      }
+      lastState = game.state;
+    }
+    if (game.state === "play") {
+      audio.playAmbience("traffic");
+    } else {
+      audio.stopAmbience("traffic");
+    }
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);

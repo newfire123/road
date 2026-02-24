@@ -817,10 +817,18 @@ var CrossRoad = (() => {
     return isMobileWidth(width);
   }
 
+  // src/scale.js
+  function computeScale(viewW, viewH, baseW = 960, baseH = 540) {
+    return Math.min(viewW / baseW, viewH / baseH);
+  }
+
   // src/main.js
+  var BASE_WIDTH = 960;
+  var BASE_HEIGHT = 540;
   var canvas = document.getElementById("game");
   var ctx = canvas.getContext("2d");
   var game = new Game(canvas, ctx);
+  var gameWrap = document.getElementById("game-wrap");
   var settings = loadSettings(localStorage);
   game.setSettings(settings);
   var audio = new AudioManager(
@@ -924,6 +932,8 @@ var CrossRoad = (() => {
   var touchDash = document.getElementById("touch-dash");
   var touchFly = document.getElementById("touch-fly");
   var mobileStart = document.getElementById("mobile-start");
+  var mobileRetry = document.getElementById("mobile-retry");
+  var mobileNext = document.getElementById("mobile-next");
   var touchState = {
     dir: { x: 0, y: 0, active: false },
     dashPressed: false,
@@ -931,15 +941,19 @@ var CrossRoad = (() => {
     pausePressed: false
   };
   game.setTouchState(touchState);
+  var currentScale = 1;
+  function updateScale() {
+    currentScale = computeScale(window.innerWidth, window.innerHeight, BASE_WIDTH, BASE_HEIGHT);
+    if (gameWrap) {
+      gameWrap.style.transform = `scale(${currentScale})`;
+    }
+  }
   function applyOrientationClass() {
     if (!touchUi) return;
     const portrait = window.innerHeight >= window.innerWidth;
     touchUi.classList.toggle("portrait", portrait);
     touchUi.classList.toggle("landscape", !portrait);
   }
-  applyOrientationClass();
-  window.addEventListener("resize", applyOrientationClass);
-  window.addEventListener("orientationchange", applyOrientationClass);
   function updateMobileUi() {
     const isMobile = shouldShowTouchUI(window.innerWidth);
     if (touchUi) {
@@ -947,14 +961,44 @@ var CrossRoad = (() => {
       touchUi.setAttribute("aria-hidden", isMobile ? "false" : "true");
     }
     if (mobileStart) {
-      mobileStart.classList.toggle("active", isMobile);
+      mobileStart.classList.toggle("active", isMobile && game.state === "title");
+    }
+    if (mobileRetry) {
+      mobileRetry.classList.toggle("active", isMobile && game.state === "fail");
+    }
+    if (mobileNext) {
+      mobileNext.classList.toggle("active", isMobile && (game.state === "win" || game.state === "complete"));
+      if (game.state === "complete") {
+        mobileNext.textContent = "\u56DE\u5230\u6807\u9898";
+      } else {
+        mobileNext.textContent = "\u4E0B\u4E00\u5173";
+      }
     }
   }
+  updateScale();
+  applyOrientationClass();
   updateMobileUi();
-  window.addEventListener("resize", updateMobileUi);
+  window.addEventListener("resize", () => {
+    updateScale();
+    applyOrientationClass();
+    updateMobileUi();
+  });
+  window.addEventListener("orientationchange", () => {
+    updateScale();
+    applyOrientationClass();
+    updateMobileUi();
+  });
   var joystickPointerId = null;
   var joystickCenter = { x: 0, y: 0 };
   var joystickRadius = 50;
+  function screenToGame(clientX, clientY) {
+    const rect = gameWrap?.getBoundingClientRect();
+    if (!rect) return { x: clientX, y: clientY };
+    return {
+      x: (clientX - rect.left) / currentScale,
+      y: (clientY - rect.top) / currentScale
+    };
+  }
   function updateStickVisual(dx, dy) {
     if (!touchStick) return;
     const max = joystickRadius;
@@ -971,9 +1015,14 @@ var CrossRoad = (() => {
       event.preventDefault();
       joystickPointerId = event.pointerId;
       const rect = touchJoystick.getBoundingClientRect();
-      joystickCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-      const dx = event.clientX - joystickCenter.x;
-      const dy = event.clientY - joystickCenter.y;
+      const centerScreen = {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2
+      };
+      joystickCenter = screenToGame(centerScreen.x, centerScreen.y);
+      const pos = screenToGame(event.clientX, event.clientY);
+      const dx = pos.x - joystickCenter.x;
+      const dy = pos.y - joystickCenter.y;
       const dir = toDirection(dx, dy, 12);
       touchState.dir = { ...dir, active: true };
       updateStickVisual(dir.x * joystickRadius, dir.y * joystickRadius);
@@ -981,8 +1030,9 @@ var CrossRoad = (() => {
     touchJoystick.addEventListener("pointermove", (event) => {
       if (joystickPointerId !== event.pointerId) return;
       event.preventDefault();
-      const dx = event.clientX - joystickCenter.x;
-      const dy = event.clientY - joystickCenter.y;
+      const pos = screenToGame(event.clientX, event.clientY);
+      const dx = pos.x - joystickCenter.x;
+      const dy = pos.y - joystickCenter.y;
       const dir = toDirection(dx, dy, 12);
       touchState.dir = { ...dir, active: true };
       updateStickVisual(dir.x * joystickRadius, dir.y * joystickRadius);
@@ -1031,6 +1081,31 @@ var CrossRoad = (() => {
       game.startLevel(1);
       game.state = "play";
       audio.playSfx("ui");
+      updateMobileUi();
+    });
+  }
+  if (mobileRetry) {
+    mobileRetry.addEventListener("click", () => {
+      if (game.state !== "fail") return;
+      game.startLevel(game.levelIndex);
+      game.state = "play";
+      audio.playSfx("ui");
+      updateMobileUi();
+    });
+  }
+  if (mobileNext) {
+    mobileNext.addEventListener("click", () => {
+      if (game.state === "complete") {
+        game.state = "title";
+        audio.playSfx("ui");
+        updateMobileUi();
+        return;
+      }
+      if (game.state !== "win") return;
+      game.startLevel(game.levelIndex + 1);
+      game.state = "play";
+      audio.playSfx("ui");
+      updateMobileUi();
     });
   }
   var last = performance.now();
@@ -1054,9 +1129,7 @@ var CrossRoad = (() => {
           settingsDirty = false;
         }
       }
-      if (mobileStart) {
-        mobileStart.classList.toggle("active", shouldShowTouchUI(window.innerWidth) && game.state === "title");
-      }
+      updateMobileUi();
       lastState = game.state;
     }
     if (game.state === "play") {

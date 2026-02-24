@@ -1,10 +1,11 @@
+import { canWin, collectCoin, shouldCollectCoin } from './coins.js';
 import { generateLevel } from './level-gen.js';
 import { createPlayer, toggleFlight, tryStartDash, updateDash, updateStamina } from './player.js';
 import { inputVector } from './input.js';
 import { updateVehicle } from './entities.js';
 import { aabbIntersects } from './collision.js';
-import { collectCoin, shouldCollectCoin } from './coins.js';
 import { clearScreen, drawCoin, drawDashBar, drawPixelRect, drawStaminaBar, drawText } from './renderer.js';
+import { normalizeSettings } from './settings.js';
 
 const SAFE_ZONE_HEIGHT = 60;
 const AIR_MONSTER_SIZE = 16;
@@ -38,10 +39,20 @@ export class Game {
     this.airMonsters = [];
     this.coins = [];
     this.coinsCollected = 0;
+    this.audio = null;
+    this.settings = normalizeSettings();
   }
 
   setKeys(keys) {
     this.keys = keys;
+  }
+
+  setAudio(audio) {
+    this.audio = audio;
+  }
+
+  setSettings(settings) {
+    this.settings = normalizeSettings(settings);
   }
 
   wasPressed(code) {
@@ -74,23 +85,26 @@ export class Game {
 
     return this.level.lanes.flatMap((lane, i) => {
       const y = roadTop + i * laneHeight + laneHeight * (1 - VEHICLE_HEIGHT_RATIO) / 2;
-      const vehicleCount = Math.min(8, this.level.vehicleCountPerLane + (i % 2));
+      const scaledCount = Math.round(this.level.vehicleCountPerLane * this.settings.vehicleCountScale);
+      const vehicleCount = Math.max(5, Math.min(8, scaledCount + (i % 2)));
       return Array.from({ length: vehicleCount }, (_, v) => {
-        const [minLen, maxLen] = this.level.vehicleLengthRange;
-        const lengthScale = randomBetween(minLen, maxLen);
+        const lengthMin = this.settings.lengthMin;
+        const lengthMax = this.settings.lengthMax;
+        const lengthScale = randomBetween(lengthMin, lengthMax);
         const w = 42 * lengthScale;
         const h = laneHeight * VEHICLE_HEIGHT_RATIO;
         const x = (v * (this.width / vehicleCount)) % this.width;
         const isVariable = Math.random() < this.level.variableSpeedChance;
-        const fastSpeed = lane.speed * 1.35;
-        const slowSpeed = lane.speed * 0.75;
+        const baseSpeed = lane.speed * this.settings.speedScale;
+        const fastSpeed = baseSpeed * 1.35;
+        const slowSpeed = baseSpeed * 0.75;
         return {
           x,
           y,
           w,
           h,
           dir: lane.direction,
-          speed: lane.speed,
+          speed: baseSpeed,
           variable: isVariable,
           fastSpeed,
           slowSpeed,
@@ -98,7 +112,7 @@ export class Game {
           slowDuration: 1.5,
           phase: 'fast',
           phaseTime: Math.random() * 1.5,
-          reverseChance: this.level.reverseChance,
+          reverseChance: this.settings.reverseChance,
           reverseCooldown: 1 + Math.random() * 2,
           color: lane.direction === 1 ? '#f8575d' : '#4bc0ff',
         };
@@ -169,11 +183,22 @@ export class Game {
     const pressedEnter = this.wasPressed('Enter');
     const pressedDash = this.wasPressed('KeyD');
     const pressedFlight = this.wasPressed('KeyF');
+    const pressedPause = this.wasPressed('Space');
 
     if (this.state === 'title') {
       if (pressedEnter) {
         this.startLevel(1);
         this.state = 'play';
+        this.audio?.playSfx('ui');
+      }
+      this.syncKeys();
+      return;
+    }
+
+    if (this.state === 'pause') {
+      if (pressedPause) {
+        this.state = 'play';
+        this.audio?.playSfx('ui');
       }
       this.syncKeys();
       return;
@@ -187,6 +212,7 @@ export class Game {
           this.startLevel(this.levelIndex + 1);
           this.state = 'play';
         }
+        this.audio?.playSfx('ui');
       }
       this.syncKeys();
       return;
@@ -195,6 +221,7 @@ export class Game {
     if (this.state === 'complete') {
       if (pressedEnter) {
         this.state = 'title';
+        this.audio?.playSfx('ui');
       }
       this.syncKeys();
       return;
@@ -204,12 +231,20 @@ export class Game {
       if (pressedEnter) {
         this.startLevel(this.levelIndex);
         this.state = 'play';
+        this.audio?.playSfx('ui');
       }
       this.syncKeys();
       return;
     }
 
     if (this.state !== 'play') {
+      this.syncKeys();
+      return;
+    }
+
+    if (pressedPause) {
+      this.state = 'pause';
+      this.audio?.playSfx('ui');
       this.syncKeys();
       return;
     }
@@ -270,29 +305,37 @@ export class Game {
     if (!this.player.isFlying) {
       if (this.vehicles.some((v) => aabbIntersects(playerBox, v))) {
         this.state = 'fail';
+        this.audio?.playSfx('fail');
         return;
       }
 
       if (this.groundMonsters.some((m) => aabbIntersects(playerBox, m))) {
         this.state = 'fail';
+        this.audio?.playSfx('fail');
         return;
       }
     }
 
     if (this.airMonsters.some((m) => m.active && aabbIntersects(playerBox, m))) {
       this.state = 'fail';
+      this.audio?.playSfx('fail');
       return;
     }
 
     for (const coin of this.coins) {
       if (coin.collected) continue;
       const canCollect = shouldCollectCoin(this.player, coin);
+      const before = this.coinsCollected;
       this.coinsCollected = collectCoin(this.coinsCollected, this.level.coinTarget, coin, canCollect);
+      if (this.coinsCollected > before) {
+        this.audio?.playSfx('coin');
+      }
     }
 
     const roadTop = SAFE_ZONE_HEIGHT;
-    if (this.player.y <= roadTop - this.player.h / 2 && this.coinsCollected >= this.level.coinTarget) {
+    if (canWin(this.coinsCollected, this.level.coinTarget, this.player.y, roadTop, this.player.h)) {
       this.state = 'win';
+      this.audio?.playSfx('success');
     }
 
     this.syncKeys();
@@ -307,6 +350,11 @@ export class Game {
     }
 
     this.renderWorld();
+
+    if (this.state === 'pause') {
+      this.renderOverlay('已暂停', '按 空格 继续');
+      return;
+    }
 
     if (this.state === 'fail') {
       this.renderOverlay('失败', '按 Enter 重来');
@@ -389,5 +437,9 @@ export class Game {
     drawText(this.ctx, `关卡 ${this.levelIndex}/9`, this.width - 80, 22, 14, '#c7ccd8', 'right');
     drawText(this.ctx, `金币 ${this.coinsCollected}/${this.level.coinTarget}`, this.width - 80, 40, 12, '#f2d45c', 'right');
     drawText(this.ctx, '方向键移动 | D冲刺 | F飞行', this.width / 2, this.height - 18, 12, '#9aa0af');
+
+    if (this.player.y <= SAFE_ZONE_HEIGHT - this.player.h / 2 && this.coinsCollected < this.level.coinTarget) {
+      drawText(this.ctx, '金币不足', this.width / 2, SAFE_ZONE_HEIGHT + 10, 14, '#f5a45b');
+    }
   }
 }

@@ -7,6 +7,57 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <div id="settings-panel" class="settings-panel" aria-hidden="true">
+      <div class="settings-card">
+        <div class="settings-title">设置</div>
+        <div class="settings-section">音量</div>
+        <label class="settings-row">
+          <span>总音量</span>
+          <input id="masterVolume" type="range" min="0" max="1" step="0.01" />
+          <span id="masterVolumeValue" class="value"></span>
+        </label>
+        <label class="settings-row">
+          <span>音效</span>
+          <input id="sfxVolume" type="range" min="0" max="1" step="0.01" />
+          <span id="sfxVolumeValue" class="value"></span>
+        </label>
+        <label class="settings-row">
+          <span>环境音</span>
+          <input id="ambienceVolume" type="range" min="0" max="1" step="0.01" />
+          <span id="ambienceVolumeValue" class="value"></span>
+        </label>
+
+        <div class="settings-section">难度</div>
+        <label class="settings-row">
+          <span>车辆数量</span>
+          <input id="vehicleCountScale" type="range" min="0.6" max="1.4" step="0.05" />
+          <span id="vehicleCountScaleValue" class="value"></span>
+        </label>
+        <label class="settings-row">
+          <span>车速倍率</span>
+          <input id="speedScale" type="range" min="0.6" max="1.6" step="0.05" />
+          <span id="speedScaleValue" class="value"></span>
+        </label>
+        <label class="settings-row">
+          <span>反向概率</span>
+          <input id="reverseChance" type="range" min="0" max="0.2" step="0.01" />
+          <span id="reverseChanceValue" class="value"></span>
+        </label>
+        <label class="settings-row">
+          <span>车长最小</span>
+          <input id="lengthMin" type="range" min="0.5" max="1.0" step="0.05" />
+          <span id="lengthMinValue" class="value"></span>
+        </label>
+        <label class="settings-row">
+          <span>车长最大</span>
+          <input id="lengthMax" type="range" min="1.0" max="1.6" step="0.05" />
+          <span id="lengthMaxValue" class="value"></span>
+        </label>
+
+        <div class="settings-hint">按 空格 继续游戏</div>
+      </div>
+    </div>
+
     <canvas id="game" width="960" height="540"></canvas>
     <!-- INLINE_SCRIPT -->
   </body>

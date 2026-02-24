@@ -16,3 +16,7 @@
 - Air monsters activate only when flying
 - Vehicles include variable length, periodic speed changes, and occasional reversal
 - Difficulty scales across 9 levels
+- Space pauses and opens settings overlay
+- Settings sliders persist after reload
+- Changing difficulty sliders restarts level after unpausing
+- Master/SFX/ambience sliders affect sound levels

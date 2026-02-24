@@ -1,0 +1,19 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #0f1014;
+  color: #e6e6e6;
+  font-family: "Courier New", Courier, monospace;
+  height: 100%;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#game {
+  border: 2px solid #2b2f3a;
+  background: #1a1d26;
+}

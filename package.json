@@ -3,6 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "build:bundle": "esbuild src/main.js --bundle --format=iife --global-name=CrossRoad --outfile=dist/bundle.js",
+    "build:inline": "node scripts/build-inline.js",
+    "build": "npm run build:bundle && npm run build:inline"
+  },
+  "devDependencies": {
+    "esbuild": "^0.23.0"
   }
 }

@@ -101,7 +101,8 @@ var CrossRoad = (() => {
       if (this.initialized) return;
       this.initialized = true;
       this.debug.initCount += 1;
-      if (window.AudioContext || window.webkitAudioContext) {
+      const isFileProtocol = typeof window !== "undefined" && window.location?.protocol === "file:";
+      if (!isFileProtocol && (window.AudioContext || window.webkitAudioContext)) {
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
         this.masterGain = this.ctx.createGain();
         this.sfxGain = this.ctx.createGain();
@@ -111,7 +112,7 @@ var CrossRoad = (() => {
         this.masterGain.connect(this.ctx.destination);
         this.debug.ctxState = this.ctx.state;
       } else {
-        this.debug.ctxState = "unavailable";
+        this.debug.ctxState = isFileProtocol ? "file-no-ctx" : "unavailable";
       }
       for (const [name, sound] of Object.entries(this.sounds)) {
         if (sound.type === "sfx") {

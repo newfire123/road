@@ -19,11 +19,20 @@ export class AudioManager {
     this.sfxPools = new Map();
     this.sfxIndex = new Map();
     this.initialized = false;
+    this.debug = {
+      initCount: 0,
+      lastSfx: '',
+      lastSfxAt: 0,
+      sfxPools: 0,
+      ambienceCount: 0,
+      ctxState: 'none',
+    };
   }
 
   init() {
     if (this.initialized) return;
     this.initialized = true;
+    this.debug.initCount += 1;
 
     if (window.AudioContext || window.webkitAudioContext) {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -33,6 +42,9 @@ export class AudioManager {
       this.sfxGain.connect(this.masterGain);
       this.ambienceGain.connect(this.masterGain);
       this.masterGain.connect(this.ctx.destination);
+      this.debug.ctxState = this.ctx.state;
+    } else {
+      this.debug.ctxState = 'unavailable';
     }
 
     for (const [name, sound] of Object.entries(this.sounds)) {
@@ -43,6 +55,8 @@ export class AudioManager {
       }
     }
 
+    this.debug.sfxPools = this.sfxPools.size;
+    this.debug.ambienceCount = this.elements.size;
     this.updateVolumes(this.settings);
   }
 
@@ -75,6 +89,9 @@ export class AudioManager {
     }
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume();
+    }
+    if (this.ctx) {
+      this.debug.ctxState = this.ctx.state;
     }
   }
 
@@ -117,6 +134,8 @@ export class AudioManager {
     this.ensureUnlocked();
     el.currentTime = 0;
     el.play();
+    this.debug.lastSfx = name;
+    this.debug.lastSfxAt = performance.now();
   }
 
   playAmbience(name) {

@@ -80,6 +80,17 @@ bindSlider('reverseChance', 'reverseChance', (v) => v.toFixed(2));
 bindSlider('lengthMin', 'lengthMin', (v) => v.toFixed(2));
 bindSlider('lengthMax', 'lengthMax', (v) => v.toFixed(2));
 
+const debugAudio = document.getElementById('debugAudio');
+if (debugAudio) {
+  debugAudio.checked = settings.debugAudio;
+  debugAudio.addEventListener('change', () => {
+    settings = normalizeSettings({ ...settings, debugAudio: debugAudio.checked });
+    saveSettings(localStorage, settings);
+    game.setSettings(settings);
+    audio.playSfx('ui');
+  });
+}
+
 function syncSettingsUI() {
   settings = normalizeSettings(settings);
   for (const key of [
@@ -91,10 +102,21 @@ function syncSettingsUI() {
     'reverseChance',
     'lengthMin',
     'lengthMax',
+    'debugAudio',
   ]) {
     const input = document.getElementById(key);
-    if (input) input.value = settings[key];
-    updateSettingLabel(key, settings[key], (v) => (key.includes('Volume') ? Math.round(v * 100) : v.toFixed(2)));
+    if (!input) continue;
+    if (input.type === 'checkbox') {
+      input.checked = Boolean(settings[key]);
+    } else {
+      input.value = settings[key];
+    }
+    if (key === 'debugAudio') continue;
+    updateSettingLabel(
+      key,
+      settings[key],
+      (v) => (key.includes('Volume') ? Math.round(v * 100) : v.toFixed(2))
+    );
   }
 }
 

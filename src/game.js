@@ -441,5 +441,11 @@ export class Game {
     if (this.player.y <= SAFE_ZONE_HEIGHT - this.player.h / 2 && this.coinsCollected < this.level.coinTarget) {
       drawText(this.ctx, '金币不足', this.width / 2, SAFE_ZONE_HEIGHT + 10, 14, '#f5a45b');
     }
+
+    if (this.settings?.debugAudio && this.audio?.debug) {
+      const d = this.audio.debug;
+      drawText(this.ctx, `AUDIO init:${d.initCount} ctx:${d.ctxState}`, 12, 520, 10, '#7fd6f1', 'left');
+      drawText(this.ctx, `sfxPools:${d.sfxPools} last:${d.lastSfx}`, 12, 532, 10, '#7fd6f1', 'left');
+    }
   }
 }

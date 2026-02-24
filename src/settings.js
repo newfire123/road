@@ -17,6 +17,7 @@ export const defaultSettings = {
   lengthMax: 1.3,
   lengthMaxMin: 1.0,
   lengthMaxMax: 1.6,
+  debugAudio: false,
 };
 
 function clamp(value, min, max) {
@@ -51,6 +52,7 @@ export function normalizeSettings(input = {}) {
     ),
     lengthMin,
     lengthMax,
+    debugAudio: Boolean(merged.debugAudio),
   };
 }
 

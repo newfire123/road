@@ -19,10 +19,19 @@ var CrossRoad = (() => {
       this.sfxPools = /* @__PURE__ */ new Map();
       this.sfxIndex = /* @__PURE__ */ new Map();
       this.initialized = false;
+      this.debug = {
+        initCount: 0,
+        lastSfx: "",
+        lastSfxAt: 0,
+        sfxPools: 0,
+        ambienceCount: 0,
+        ctxState: "none"
+      };
     }
     init() {
       if (this.initialized) return;
       this.initialized = true;
+      this.debug.initCount += 1;
       if (window.AudioContext || window.webkitAudioContext) {
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
         this.masterGain = this.ctx.createGain();
@@ -31,6 +40,9 @@ var CrossRoad = (() => {
         this.sfxGain.connect(this.masterGain);
         this.ambienceGain.connect(this.masterGain);
         this.masterGain.connect(this.ctx.destination);
+        this.debug.ctxState = this.ctx.state;
+      } else {
+        this.debug.ctxState = "unavailable";
       }
       for (const [name, sound] of Object.entries(this.sounds)) {
         if (sound.type === "sfx") {
@@ -39,6 +51,8 @@ var CrossRoad = (() => {
           this.createElement(name, sound.src, this.ambienceGain, true);
         }
       }
+      this.debug.sfxPools = this.sfxPools.size;
+      this.debug.ambienceCount = this.elements.size;
       this.updateVolumes(this.settings);
     }
     createElement(name, src, gainNode, loop2 = false) {
@@ -68,6 +82,9 @@ var CrossRoad = (() => {
       }
       if (this.ctx && this.ctx.state === "suspended") {
         this.ctx.resume();
+      }
+      if (this.ctx) {
+        this.debug.ctxState = this.ctx.state;
       }
     }
     updateVolumes(settings2) {
@@ -106,6 +123,8 @@ var CrossRoad = (() => {
       this.ensureUnlocked();
       el.currentTime = 0;
       el.play();
+      this.debug.lastSfx = name;
+      this.debug.lastSfxAt = performance.now();
     }
     playAmbience(name) {
       if (!this.initialized) {
@@ -320,7 +339,8 @@ var CrossRoad = (() => {
     lengthMinMax: 1,
     lengthMax: 1.3,
     lengthMaxMin: 1,
-    lengthMaxMax: 1.6
+    lengthMaxMax: 1.6,
+    debugAudio: false
   };
   function clamp2(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -351,7 +371,8 @@ var CrossRoad = (() => {
         defaultSettings.reverseChanceMax
       ),
       lengthMin,
-      lengthMax
+      lengthMax,
+      debugAudio: Boolean(merged.debugAudio)
     };
   }
   function loadSettings(storage, key = "crossRoadSettings") {
@@ -739,6 +760,11 @@ var CrossRoad = (() => {
       if (this.player.y <= SAFE_ZONE_HEIGHT - this.player.h / 2 && this.coinsCollected < this.level.coinTarget) {
         drawText(this.ctx, "\u91D1\u5E01\u4E0D\u8DB3", this.width / 2, SAFE_ZONE_HEIGHT + 10, 14, "#f5a45b");
       }
+      if (this.settings?.debugAudio && this.audio?.debug) {
+        const d = this.audio.debug;
+        drawText(this.ctx, `AUDIO init:${d.initCount} ctx:${d.ctxState}`, 12, 520, 10, "#7fd6f1", "left");
+        drawText(this.ctx, `sfxPools:${d.sfxPools} last:${d.lastSfx}`, 12, 532, 10, "#7fd6f1", "left");
+      }
     }
   };
 
@@ -803,6 +829,16 @@ var CrossRoad = (() => {
   bindSlider("reverseChance", "reverseChance", (v) => v.toFixed(2));
   bindSlider("lengthMin", "lengthMin", (v) => v.toFixed(2));
   bindSlider("lengthMax", "lengthMax", (v) => v.toFixed(2));
+  var debugAudio = document.getElementById("debugAudio");
+  if (debugAudio) {
+    debugAudio.checked = settings.debugAudio;
+    debugAudio.addEventListener("change", () => {
+      settings = normalizeSettings({ ...settings, debugAudio: debugAudio.checked });
+      saveSettings(localStorage, settings);
+      game.setSettings(settings);
+      audio.playSfx("ui");
+    });
+  }
   function syncSettingsUI() {
     settings = normalizeSettings(settings);
     for (const key of [
@@ -813,11 +849,22 @@ var CrossRoad = (() => {
       "speedScale",
       "reverseChance",
       "lengthMin",
-      "lengthMax"
+      "lengthMax",
+      "debugAudio"
     ]) {
       const input = document.getElementById(key);
-      if (input) input.value = settings[key];
-      updateSettingLabel(key, settings[key], (v) => key.includes("Volume") ? Math.round(v * 100) : v.toFixed(2));
+      if (!input) continue;
+      if (input.type === "checkbox") {
+        input.checked = Boolean(settings[key]);
+      } else {
+        input.value = settings[key];
+      }
+      if (key === "debugAudio") continue;
+      updateSettingLabel(
+        key,
+        settings[key],
+        (v) => key.includes("Volume") ? Math.round(v * 100) : v.toFixed(2)
+      );
     }
   }
   syncSettingsUI();

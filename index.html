@@ -184,6 +184,18 @@ var CrossRoad = (() => {
       if (!this.initialized) {
         this.init();
       }
+      if (!this.ctx) {
+        const sound = this.sounds[name];
+        if (!sound) return;
+        const el2 = new Audio(sound.src);
+        el2.volume = computeVolume(this.settings.masterVolume, this.settings.sfxVolume);
+        this.ensureUnlocked();
+        el2.currentTime = 0;
+        el2.play();
+        this.debug.lastSfx = name;
+        this.debug.lastSfxAt = performance.now();
+        return;
+      }
       const pool = this.sfxPools.get(name);
       if (!pool || pool.length === 0) return;
       const idx = this.sfxIndex.get(name) ?? 0;

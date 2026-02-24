@@ -126,6 +126,18 @@ export class AudioManager {
     if (!this.initialized) {
       this.init();
     }
+    if (!this.ctx) {
+      const sound = this.sounds[name];
+      if (!sound) return;
+      const el = new Audio(sound.src);
+      el.volume = computeVolume(this.settings.masterVolume, this.settings.sfxVolume);
+      this.ensureUnlocked();
+      el.currentTime = 0;
+      el.play();
+      this.debug.lastSfx = name;
+      this.debug.lastSfxAt = performance.now();
+      return;
+    }
     const pool = this.sfxPools.get(name);
     if (!pool || pool.length === 0) return;
     const idx = this.sfxIndex.get(name) ?? 0;

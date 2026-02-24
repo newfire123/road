@@ -1,4 +1,13 @@
 export function updateVehicle(vehicle, dt, width) {
+  if (vehicle.variable) {
+    vehicle.phaseTime += dt;
+    const duration = vehicle.phase === 'fast' ? vehicle.fastDuration : vehicle.slowDuration;
+    if (vehicle.phaseTime >= duration) {
+      vehicle.phaseTime = 0;
+      vehicle.phase = vehicle.phase === 'fast' ? 'slow' : 'fast';
+    }
+    vehicle.speed = vehicle.phase === 'fast' ? vehicle.fastSpeed : vehicle.slowSpeed;
+  }
   vehicle.x += vehicle.speed * vehicle.dir * dt;
   if (vehicle.dir === 1 && vehicle.x > width) {
     vehicle.x = -vehicle.w;

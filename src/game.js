@@ -1,15 +1,20 @@
 import { generateLevel } from './level-gen.js';
-import { createPlayer, toggleFlight, tryStartSprint, updateEnergy, updateSprint } from './player.js';
+import { createPlayer, toggleFlight, tryStartDash, updateDash, updateStamina } from './player.js';
 import { inputVector } from './input.js';
 import { updateVehicle } from './entities.js';
 import { aabbIntersects } from './collision.js';
-import { clearScreen, drawEnergyBar, drawPixelRect, drawText } from './renderer.js';
+import { clearScreen, drawDashBar, drawPixelRect, drawStaminaBar, drawText } from './renderer.js';
 
 const SAFE_ZONE_HEIGHT = 60;
-const PLAYER_SIZE = 18;
 const AIR_MONSTER_SIZE = 16;
 const GROUND_MONSTER_SIZE = 18;
 const VEHICLE_HEIGHT_RATIO = 0.6;
+const DASH_BAR_WIDTH = 90;
+const DASH_BAR_HEIGHT = 8;
+
+function randomBetween(min, max) {
+  return min + Math.random() * (max - min);
+}
 
 export class Game {
   constructor(canvas, ctx) {
@@ -46,11 +51,9 @@ export class Game {
   startLevel(levelIndex) {
     this.levelIndex = levelIndex;
     this.level = generateLevel(levelIndex);
-    this.player = createPlayer();
-    this.player.w = PLAYER_SIZE;
-    this.player.h = PLAYER_SIZE;
-    this.player.x = this.width / 2 - PLAYER_SIZE / 2;
-    this.player.y = this.height - SAFE_ZONE_HEIGHT / 2 - PLAYER_SIZE / 2;
+    this.player = createPlayer(levelIndex);
+    this.player.x = this.width / 2 - this.player.w / 2;
+    this.player.y = this.height - SAFE_ZONE_HEIGHT / 2 - this.player.h / 2;
 
     this.vehicles = this.buildVehicles();
     this.groundMonsters = this.buildGroundMonsters();
@@ -66,9 +69,14 @@ export class Game {
     return this.level.lanes.flatMap((lane, i) => {
       const y = roadTop + i * laneHeight + laneHeight * (1 - VEHICLE_HEIGHT_RATIO) / 2;
       return Array.from({ length: lane.vehicleCount }, (_, v) => {
-        const w = 42;
+        const [minLen, maxLen] = this.level.vehicleLengthRange;
+        const lengthScale = randomBetween(minLen, maxLen);
+        const w = 42 * lengthScale;
         const h = laneHeight * VEHICLE_HEIGHT_RATIO;
         const x = (v * (this.width / lane.vehicleCount)) % this.width;
+        const isVariable = Math.random() < this.level.variableSpeedChance;
+        const fastSpeed = lane.speed * 1.35;
+        const slowSpeed = lane.speed * 0.75;
         return {
           x,
           y,
@@ -76,6 +84,13 @@ export class Game {
           h,
           dir: lane.direction,
           speed: lane.speed,
+          variable: isVariable,
+          fastSpeed,
+          slowSpeed,
+          fastDuration: 1.5,
+          slowDuration: 1.5,
+          phase: 'fast',
+          phaseTime: Math.random() * 1.5,
           color: lane.direction === 1 ? '#f8575d' : '#4bc0ff',
         };
       });
@@ -114,7 +129,7 @@ export class Game {
 
   update(dt) {
     const pressedEnter = this.wasPressed('Enter');
-    const pressedSprint = this.wasPressed('KeyD');
+    const pressedDash = this.wasPressed('KeyD');
     const pressedFlight = this.wasPressed('KeyF');
 
     if (this.state === 'title') {
@@ -162,20 +177,31 @@ export class Game {
     }
 
     const move = inputVector(this.keys);
-    if (pressedSprint) {
-      tryStartSprint(this.player);
+    if (pressedDash) {
+      tryStartDash(this.player, move);
     }
     toggleFlight(this.player, pressedFlight);
 
-    updateSprint(this.player, dt);
-    updateEnergy(this.player, dt, this.level.energyDrainPerSec, this.level.energyRegenPerSec);
-    if (this.player.energy <= 0) {
+    updateDash(this.player, dt);
+    updateStamina(this.player, dt, {
+      flyDrainPerSec: this.level.flyDrainPerSec,
+      dashDrainPerSec: this.level.dashDrainPerSec,
+      regenPerSec: this.level.staminaRegenPerSec,
+    });
+    if (this.player.stamina <= 0) {
       this.player.isFlying = false;
+      if (this.player.dashTimeRemaining > 0) {
+        this.player.dashTimeRemaining = 0;
+      }
     }
 
-    const speed = this.player.sprintTimeRemaining > 0 ? this.player.sprintSpeed : this.player.speed;
-    this.player.x += move.x * speed * dt;
-    this.player.y += move.y * speed * dt;
+    if (this.player.dashTimeRemaining > 0) {
+      this.player.x += this.player.dashVector.x * this.player.dashSpeed * dt;
+      this.player.y += this.player.dashVector.y * this.player.dashSpeed * dt;
+    } else {
+      this.player.x += move.x * this.player.speed * dt;
+      this.player.y += move.y * this.player.speed * dt;
+    }
 
     this.player.x = Math.max(0, Math.min(this.player.x, this.width - this.player.w));
     this.player.y = Math.max(0, Math.min(this.player.y, this.height - this.player.h));
@@ -203,14 +229,16 @@ export class Game {
 
     const playerBox = { x: this.player.x, y: this.player.y, w: this.player.w, h: this.player.h };
 
-    if (this.vehicles.some((v) => aabbIntersects(playerBox, v))) {
-      this.state = 'fail';
-      return;
-    }
+    if (!this.player.isFlying) {
+      if (this.vehicles.some((v) => aabbIntersects(playerBox, v))) {
+        this.state = 'fail';
+        return;
+      }
 
-    if (this.groundMonsters.some((m) => aabbIntersects(playerBox, m))) {
-      this.state = 'fail';
-      return;
+      if (this.groundMonsters.some((m) => aabbIntersects(playerBox, m))) {
+        this.state = 'fail';
+        return;
+      }
     }
 
     if (this.airMonsters.some((m) => m.active && aabbIntersects(playerBox, m))) {
@@ -278,7 +306,12 @@ export class Game {
     }
 
     for (const vehicle of this.vehicles) {
-      drawPixelRect(this.ctx, vehicle.x, vehicle.y, vehicle.w, vehicle.h, vehicle.color);
+      const bodyColor = vehicle.variable
+        ? vehicle.phase === 'fast'
+          ? '#ff8c61'
+          : vehicle.color
+        : vehicle.color;
+      drawPixelRect(this.ctx, vehicle.x, vehicle.y, vehicle.w, vehicle.h, bodyColor);
       drawPixelRect(this.ctx, vehicle.x + 4, vehicle.y + 4, 6, 6, '#ffe57a');
     }
 
@@ -298,8 +331,12 @@ export class Game {
       drawPixelRect(this.ctx, monster.x + 2, monster.y + 2, 4, 4, '#a4c2ff');
     }
 
-    const energyRatio = this.player.energy / this.player.maxEnergy;
-    drawEnergyBar(this.ctx, 20, 16, 140, 16, energyRatio);
+    const staminaRatio = this.player.stamina / this.player.maxStamina;
+    drawStaminaBar(this.ctx, 20, 16, 140, 16, staminaRatio);
+    if (this.player.dashTimeRemaining > 0) {
+      const dashRatio = this.player.dashTimeRemaining / this.player.dashDuration;
+      drawDashBar(this.ctx, 20, 36, DASH_BAR_WIDTH, DASH_BAR_HEIGHT, dashRatio);
+    }
     drawText(this.ctx, `关卡 ${this.levelIndex}/9`, this.width - 80, 22, 14, '#c7ccd8', 'right');
     drawText(this.ctx, '方向键移动 | D冲刺 | F飞行', this.width / 2, this.height - 18, 12, '#9aa0af');
   }

@@ -14,8 +14,11 @@ export function generateLevel(level) {
     level: clamped,
     lanes,
     groundMonsterCount: Math.floor(clamped / 2),
-    airMonsterCount: Math.max(1, Math.floor(clamped / 3)),
-    energyDrainPerSec: 18,
-    energyRegenPerSec: 10,
+    airMonsterCount: Math.max(1, Math.ceil(clamped / 2)),
+    staminaRegenPerSec: 10,
+    flyDrainPerSec: 20,
+    dashDrainPerSec: 25,
+    variableSpeedChance: Math.min(0.6, 0.15 + clamped * 0.05),
+    vehicleLengthRange: [0.7, 1.3],
   };
 }

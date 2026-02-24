@@ -1,5 +1,5 @@
 import { generateLevel } from './level-gen.js';
-import { createPlayer, updateEnergy } from './player.js';
+import { createPlayer, toggleFlight, tryStartSprint, updateEnergy, updateSprint } from './player.js';
 import { inputVector } from './input.js';
 import { updateVehicle } from './entities.js';
 import { aabbIntersects } from './collision.js';
@@ -22,7 +22,7 @@ export class Game {
     this.levelIndex = 1;
 
     this.keys = {};
-    this.lastInput = null;
+    this.lastKeys = {};
 
     this.player = null;
     this.level = null;
@@ -33,6 +33,14 @@ export class Game {
 
   setKeys(keys) {
     this.keys = keys;
+  }
+
+  wasPressed(code) {
+    return Boolean(this.keys[code]) && !this.lastKeys[code];
+  }
+
+  syncKeys() {
+    this.lastKeys = { ...this.keys };
   }
 
   startLevel(levelIndex) {
@@ -105,16 +113,21 @@ export class Game {
   }
 
   update(dt) {
+    const pressedEnter = this.wasPressed('Enter');
+    const pressedSprint = this.wasPressed('KeyD');
+    const pressedFlight = this.wasPressed('KeyF');
+
     if (this.state === 'title') {
-      if (this.keys.Enter) {
+      if (pressedEnter) {
         this.startLevel(1);
         this.state = 'play';
       }
+      this.syncKeys();
       return;
     }
 
     if (this.state === 'win') {
-      if (this.keys.Enter) {
+      if (pressedEnter) {
         if (this.levelIndex >= 9) {
           this.state = 'complete';
         } else {
@@ -122,43 +135,45 @@ export class Game {
           this.state = 'play';
         }
       }
+      this.syncKeys();
       return;
     }
 
     if (this.state === 'complete') {
-      if (this.keys.Enter) {
+      if (pressedEnter) {
         this.state = 'title';
       }
+      this.syncKeys();
       return;
     }
 
     if (this.state === 'fail') {
-      if (this.keys.Enter) {
+      if (pressedEnter) {
         this.startLevel(this.levelIndex);
         this.state = 'play';
       }
+      this.syncKeys();
       return;
     }
 
     if (this.state !== 'play') {
+      this.syncKeys();
       return;
     }
 
     const move = inputVector(this.keys);
-    const sprint = this.keys.KeyD;
-    const wantsFly = this.keys.KeyF;
-    if (wantsFly && this.player.energy > 0) {
-      this.player.isFlying = true;
-    } else {
-      this.player.isFlying = false;
+    if (pressedSprint) {
+      tryStartSprint(this.player);
     }
+    toggleFlight(this.player, pressedFlight);
 
+    updateSprint(this.player, dt);
     updateEnergy(this.player, dt, this.level.energyDrainPerSec, this.level.energyRegenPerSec);
     if (this.player.energy <= 0) {
       this.player.isFlying = false;
     }
 
-    const speed = sprint ? this.player.sprintSpeed : this.player.speed;
+    const speed = this.player.sprintTimeRemaining > 0 ? this.player.sprintSpeed : this.player.speed;
     this.player.x += move.x * speed * dt;
     this.player.y += move.y * speed * dt;
 
@@ -207,6 +222,8 @@ export class Game {
     if (this.player.y <= roadTop - this.player.h / 2) {
       this.state = 'win';
     }
+
+    this.syncKeys();
   }
 
   render() {

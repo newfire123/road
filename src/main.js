@@ -2,6 +2,7 @@ import { AudioManager } from './audio.js';
 import { Game } from './game.js';
 import { defaultSettings, loadSettings, normalizeSettings, saveSettings } from './settings.js';
 import { toDirection } from './touch.js';
+import { shouldShowTouchUI } from './mobile.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -129,6 +130,7 @@ const touchJoystick = document.getElementById('touch-joystick');
 const touchStick = document.getElementById('touch-stick');
 const touchDash = document.getElementById('touch-dash');
 const touchFly = document.getElementById('touch-fly');
+const mobileStart = document.getElementById('mobile-start');
 
 const touchState = {
   dir: { x: 0, y: 0, active: false },
@@ -138,17 +140,6 @@ const touchState = {
 };
 
 game.setTouchState(touchState);
-
-function setTouchUiActive(active) {
-  if (!touchUi) return;
-  if (active) {
-    touchUi.classList.add('active');
-    touchUi.setAttribute('aria-hidden', 'false');
-  } else {
-    touchUi.classList.remove('active');
-    touchUi.setAttribute('aria-hidden', 'true');
-  }
-}
 
 function applyOrientationClass() {
   if (!touchUi) return;
@@ -161,8 +152,19 @@ applyOrientationClass();
 window.addEventListener('resize', applyOrientationClass);
 window.addEventListener('orientationchange', applyOrientationClass);
 
-setTouchUiActive(window.innerWidth < 900);
-window.addEventListener('resize', () => setTouchUiActive(window.innerWidth < 900));
+function updateMobileUi() {
+  const isMobile = shouldShowTouchUI(window.innerWidth);
+  if (touchUi) {
+    touchUi.classList.toggle('active', isMobile);
+    touchUi.setAttribute('aria-hidden', isMobile ? 'false' : 'true');
+  }
+  if (mobileStart) {
+    mobileStart.classList.toggle('active', isMobile);
+  }
+}
+
+updateMobileUi();
+window.addEventListener('resize', updateMobileUi);
 
 let joystickPointerId = null;
 let joystickCenter = { x: 0, y: 0 };
@@ -196,6 +198,7 @@ if (touchJoystick) {
 
   touchJoystick.addEventListener('pointermove', (event) => {
     if (joystickPointerId !== event.pointerId) return;
+    event.preventDefault();
     const dx = event.clientX - joystickCenter.x;
     const dy = event.clientY - joystickCenter.y;
     const dir = toDirection(dx, dy, 12);
@@ -205,6 +208,7 @@ if (touchJoystick) {
 
   const endJoystick = (event) => {
     if (joystickPointerId !== event.pointerId) return;
+    event.preventDefault();
     joystickPointerId = null;
     touchState.dir = { x: 0, y: 0, active: false };
     resetStickVisual();
@@ -222,7 +226,8 @@ function bindPressButton(button, key) {
     touchState[key] = true;
     button.classList.add('active');
   });
-  const release = () => {
+  const release = (event) => {
+    if (event) event.preventDefault();
     touchState[key] = false;
     button.classList.remove('active');
   };
@@ -241,6 +246,15 @@ if (touchPause) {
     setTimeout(() => {
       touchState.pausePressed = false;
     }, 120);
+  });
+}
+
+if (mobileStart) {
+  mobileStart.addEventListener('click', () => {
+    if (game.state !== 'title') return;
+    game.startLevel(1);
+    game.state = 'play';
+    audio.playSfx('ui');
   });
 }
 
@@ -265,6 +279,9 @@ function loop(now) {
         game.startLevel(game.levelIndex);
         settingsDirty = false;
       }
+    }
+    if (mobileStart) {
+      mobileStart.classList.toggle('active', shouldShowTouchUI(window.innerWidth) && game.state === 'title');
     }
     lastState = game.state;
   }

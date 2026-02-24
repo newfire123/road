@@ -23,3 +23,6 @@
 - Touch UI appears on small screens
 - Right-bottom joystick, left-bottom dash/fly, right-top pause
 - Orientation change flips layout (portrait/landscape)
+- Mobile shows "开始游戏" button on title screen
+- Desktop does not show touch UI or mobile start button
+- Dragging joystick does not scroll page

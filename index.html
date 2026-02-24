@@ -30,7 +30,12 @@ var CrossRoad = (() => {
       flyDrainPerSec: 20,
       dashDrainPerSec: 25,
       variableSpeedChance: Math.min(0.6, 0.15 + clamped * 0.05),
-      vehicleLengthRange: [0.7, 1.3]
+      vehicleLengthRange: [0.7, 1.3],
+      coinCount: 15,
+      coinTarget: 9,
+      coinSpread: 0.2 + clamped * 0.06,
+      reverseChance: Math.min(0.2, 0.1 + clamped * 0.01),
+      vehicleCountPerLane: Math.min(8, 5 + Math.floor(clamped / 3))
     };
   }
 
@@ -98,6 +103,7 @@ var CrossRoad = (() => {
 
   // src/entities.js
   function updateVehicle(vehicle, dt, width) {
+    maybeReverseVehicle(vehicle, dt, vehicle.reverseChance ?? 0);
     if (vehicle.variable) {
       vehicle.phaseTime += dt;
       const duration = vehicle.phase === "fast" ? vehicle.fastDuration : vehicle.slowDuration;
@@ -115,10 +121,32 @@ var CrossRoad = (() => {
       vehicle.x = width;
     }
   }
+  function maybeReverseVehicle(vehicle, dt, chance) {
+    vehicle.reverseCooldown = Math.max(0, (vehicle.reverseCooldown ?? 0) - dt);
+    if (vehicle.reverseCooldown > 0) return;
+    if (Math.random() < chance) {
+      vehicle.dir *= -1;
+      vehicle.reverseCooldown = 3 + Math.random() * 2;
+    }
+  }
 
   // src/collision.js
   function aabbIntersects(a, b) {
     return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
+  // src/coins.js
+  function shouldCollectCoin(player, coin) {
+    if (player.isFlying) return false;
+    const box = { x: coin.x - coin.r, y: coin.y - coin.r, w: coin.r * 2, h: coin.r * 2 };
+    return aabbIntersects(player, box);
+  }
+  function collectCoin(current, target, coin, canCollect) {
+    if (!canCollect) return current;
+    if (coin.collected) return current;
+    if (current >= target) return current;
+    coin.collected = true;
+    return current + 1;
   }
 
   // src/renderer.js
@@ -148,6 +176,11 @@ var CrossRoad = (() => {
     ctx2.strokeStyle = "#2f3545";
     ctx2.strokeRect(x, y, width, height);
   }
+  function drawCoin(ctx2, x, y, r) {
+    drawPixelRect(ctx2, x - r, y - r, r * 2, r * 2, "#f5d34b");
+    drawPixelRect(ctx2, x - r + 2, y - r + 2, r * 2 - 4, r * 2 - 4, "#e2b93f");
+    drawPixelRect(ctx2, x - 1, y - 1, 2, 2, "#fff2a6");
+  }
 
   // src/game.js
   var SAFE_ZONE_HEIGHT = 60;
@@ -156,6 +189,7 @@ var CrossRoad = (() => {
   var VEHICLE_HEIGHT_RATIO = 0.6;
   var DASH_BAR_WIDTH = 90;
   var DASH_BAR_HEIGHT = 8;
+  var COIN_RADIUS = 6;
   function randomBetween(min, max) {
     return min + Math.random() * (max - min);
   }
@@ -174,6 +208,8 @@ var CrossRoad = (() => {
       this.vehicles = [];
       this.groundMonsters = [];
       this.airMonsters = [];
+      this.coins = [];
+      this.coinsCollected = 0;
     }
     setKeys(keys2) {
       this.keys = keys2;
@@ -193,6 +229,8 @@ var CrossRoad = (() => {
       this.vehicles = this.buildVehicles();
       this.groundMonsters = this.buildGroundMonsters();
       this.airMonsters = this.buildAirMonsters();
+      this.coins = this.buildCoins();
+      this.coinsCollected = 0;
     }
     buildVehicles() {
       const roadTop = SAFE_ZONE_HEIGHT;
@@ -201,12 +239,13 @@ var CrossRoad = (() => {
       const laneHeight = roadHeight / this.level.lanes.length;
       return this.level.lanes.flatMap((lane, i) => {
         const y = roadTop + i * laneHeight + laneHeight * (1 - VEHICLE_HEIGHT_RATIO) / 2;
-        return Array.from({ length: lane.vehicleCount }, (_, v) => {
+        const vehicleCount = Math.min(8, this.level.vehicleCountPerLane + i % 2);
+        return Array.from({ length: vehicleCount }, (_, v) => {
           const [minLen, maxLen] = this.level.vehicleLengthRange;
           const lengthScale = randomBetween(minLen, maxLen);
           const w = 42 * lengthScale;
           const h = laneHeight * VEHICLE_HEIGHT_RATIO;
-          const x = v * (this.width / lane.vehicleCount) % this.width;
+          const x = v * (this.width / vehicleCount) % this.width;
           const isVariable = Math.random() < this.level.variableSpeedChance;
           const fastSpeed = lane.speed * 1.35;
           const slowSpeed = lane.speed * 0.75;
@@ -224,10 +263,37 @@ var CrossRoad = (() => {
             slowDuration: 1.5,
             phase: "fast",
             phaseTime: Math.random() * 1.5,
+            reverseChance: this.level.reverseChance,
+            reverseCooldown: 1 + Math.random() * 2,
             color: lane.direction === 1 ? "#f8575d" : "#4bc0ff"
           };
         });
       });
+    }
+    buildCoins() {
+      const roadTop = SAFE_ZONE_HEIGHT;
+      const roadBottom = this.height - SAFE_ZONE_HEIGHT;
+      const padding = 14;
+      const minDist = 18 + this.level.coinSpread * 24;
+      const coins = [];
+      let attempts = 0;
+      while (coins.length < this.level.coinCount && attempts < this.level.coinCount * 30) {
+        attempts += 1;
+        const x = randomBetween(padding, this.width - padding);
+        const y = randomBetween(roadTop + padding, roadBottom - padding);
+        const tooClose = coins.some((c) => Math.hypot(c.x - x, c.y - y) < minDist);
+        if (tooClose) continue;
+        coins.push({ x, y, r: COIN_RADIUS, collected: false });
+      }
+      while (coins.length < this.level.coinCount) {
+        coins.push({
+          x: randomBetween(padding, this.width - padding),
+          y: randomBetween(roadTop + padding, roadBottom - padding),
+          r: COIN_RADIUS,
+          collected: false
+        });
+      }
+      return coins;
     }
     buildGroundMonsters() {
       const roadTop = SAFE_ZONE_HEIGHT;
@@ -359,8 +425,13 @@ var CrossRoad = (() => {
         this.state = "fail";
         return;
       }
+      for (const coin of this.coins) {
+        if (coin.collected) continue;
+        const canCollect = shouldCollectCoin(this.player, coin);
+        this.coinsCollected = collectCoin(this.coinsCollected, this.level.coinTarget, coin, canCollect);
+      }
       const roadTop = SAFE_ZONE_HEIGHT;
-      if (this.player.y <= roadTop - this.player.h / 2) {
+      if (this.player.y <= roadTop - this.player.h / 2 && this.coinsCollected >= this.level.coinTarget) {
         this.state = "win";
       }
       this.syncKeys();
@@ -424,6 +495,10 @@ var CrossRoad = (() => {
         drawPixelRect(this.ctx, monster.x, monster.y, monster.w, monster.h, "#4d7cff");
         drawPixelRect(this.ctx, monster.x + 2, monster.y + 2, 4, 4, "#a4c2ff");
       }
+      for (const coin of this.coins) {
+        if (coin.collected) continue;
+        drawCoin(this.ctx, coin.x, coin.y, coin.r);
+      }
       const staminaRatio = this.player.stamina / this.player.maxStamina;
       drawStaminaBar(this.ctx, 20, 16, 140, 16, staminaRatio);
       if (this.player.dashTimeRemaining > 0) {
@@ -431,6 +506,7 @@ var CrossRoad = (() => {
         drawDashBar(this.ctx, 20, 36, DASH_BAR_WIDTH, DASH_BAR_HEIGHT, dashRatio);
       }
       drawText(this.ctx, `\u5173\u5361 ${this.levelIndex}/9`, this.width - 80, 22, 14, "#c7ccd8", "right");
+      drawText(this.ctx, `\u91D1\u5E01 ${this.coinsCollected}/${this.level.coinTarget}`, this.width - 80, 40, 12, "#f2d45c", "right");
       drawText(this.ctx, "\u65B9\u5411\u952E\u79FB\u52A8 | D\u51B2\u523A | F\u98DE\u884C", this.width / 2, this.height - 18, 12, "#9aa0af");
     }
   };

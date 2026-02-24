@@ -1,14 +1,3 @@
-<!doctype html>
-<html lang="zh-CN">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Cross Road</title>
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <canvas id="game" width="960" height="540"></canvas>
-    <script>
 var CrossRoad = (() => {
   // src/level-gen.js
   function generateLevel(level) {
@@ -457,7 +446,3 @@ var CrossRoad = (() => {
   }
   requestAnimationFrame(loop);
 })();
-
-</script>
-  </body>
-</html>

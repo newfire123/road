@@ -18,18 +18,22 @@ export class AudioManager {
     this.elements = new Map();
     this.sfxPools = new Map();
     this.sfxIndex = new Map();
+    this.initialized = false;
   }
 
   init() {
-    if (this.ctx) return;
-    if (!window.AudioContext && !window.webkitAudioContext) return;
-    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-    this.masterGain = this.ctx.createGain();
-    this.sfxGain = this.ctx.createGain();
-    this.ambienceGain = this.ctx.createGain();
-    this.sfxGain.connect(this.masterGain);
-    this.ambienceGain.connect(this.masterGain);
-    this.masterGain.connect(this.ctx.destination);
+    if (this.initialized) return;
+    this.initialized = true;
+
+    if (window.AudioContext || window.webkitAudioContext) {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.masterGain = this.ctx.createGain();
+      this.sfxGain = this.ctx.createGain();
+      this.ambienceGain = this.ctx.createGain();
+      this.sfxGain.connect(this.masterGain);
+      this.ambienceGain.connect(this.masterGain);
+      this.masterGain.connect(this.ctx.destination);
+    }
 
     for (const [name, sound] of Object.entries(this.sounds)) {
       if (sound.type === 'sfx') {
@@ -47,7 +51,7 @@ export class AudioManager {
     el.preload = 'auto';
     el.loop = loop;
     this.elements.set(name, el);
-    if (this.ctx) {
+    if (this.ctx && gainNode) {
       const node = this.ctx.createMediaElementSource(el);
       node.connect(gainNode);
     }

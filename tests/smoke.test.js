@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bootMessage } from '../src/main.js';
+import { Game } from '../src/game.js';
 
-test('boot message is defined', () => {
-  assert.equal(bootMessage(), 'Cross Road boot');
+test('game class is defined', () => {
+  assert.equal(typeof Game, 'function');
 });

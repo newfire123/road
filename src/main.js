@@ -3,10 +3,15 @@ import { Game } from './game.js';
 import { defaultSettings, loadSettings, normalizeSettings, saveSettings } from './settings.js';
 import { toDirection } from './touch.js';
 import { shouldShowTouchUI } from './mobile.js';
+import { computeScale } from './scale.js';
+
+const BASE_WIDTH = 960;
+const BASE_HEIGHT = 540;
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const game = new Game(canvas, ctx);
+const gameWrap = document.getElementById('game-wrap');
 
 let settings = loadSettings(localStorage);
 
@@ -131,6 +136,8 @@ const touchStick = document.getElementById('touch-stick');
 const touchDash = document.getElementById('touch-dash');
 const touchFly = document.getElementById('touch-fly');
 const mobileStart = document.getElementById('mobile-start');
+const mobileRetry = document.getElementById('mobile-retry');
+const mobileNext = document.getElementById('mobile-next');
 
 const touchState = {
   dir: { x: 0, y: 0, active: false },
@@ -141,16 +148,20 @@ const touchState = {
 
 game.setTouchState(touchState);
 
+let currentScale = 1;
+function updateScale() {
+  currentScale = computeScale(window.innerWidth, window.innerHeight, BASE_WIDTH, BASE_HEIGHT);
+  if (gameWrap) {
+    gameWrap.style.transform = `scale(${currentScale})`;
+  }
+}
+
 function applyOrientationClass() {
   if (!touchUi) return;
   const portrait = window.innerHeight >= window.innerWidth;
   touchUi.classList.toggle('portrait', portrait);
   touchUi.classList.toggle('landscape', !portrait);
 }
-
-applyOrientationClass();
-window.addEventListener('resize', applyOrientationClass);
-window.addEventListener('orientationchange', applyOrientationClass);
 
 function updateMobileUi() {
   const isMobile = shouldShowTouchUI(window.innerWidth);
@@ -159,16 +170,47 @@ function updateMobileUi() {
     touchUi.setAttribute('aria-hidden', isMobile ? 'false' : 'true');
   }
   if (mobileStart) {
-    mobileStart.classList.toggle('active', isMobile);
+    mobileStart.classList.toggle('active', isMobile && game.state === 'title');
+  }
+  if (mobileRetry) {
+    mobileRetry.classList.toggle('active', isMobile && game.state === 'fail');
+  }
+  if (mobileNext) {
+    mobileNext.classList.toggle('active', isMobile && (game.state === 'win' || game.state === 'complete'));
+    if (game.state === 'complete') {
+      mobileNext.textContent = '回到标题';
+    } else {
+      mobileNext.textContent = '下一关';
+    }
   }
 }
 
+updateScale();
+applyOrientationClass();
 updateMobileUi();
-window.addEventListener('resize', updateMobileUi);
+window.addEventListener('resize', () => {
+  updateScale();
+  applyOrientationClass();
+  updateMobileUi();
+});
+window.addEventListener('orientationchange', () => {
+  updateScale();
+  applyOrientationClass();
+  updateMobileUi();
+});
 
 let joystickPointerId = null;
 let joystickCenter = { x: 0, y: 0 };
 const joystickRadius = 50;
+
+function screenToGame(clientX, clientY) {
+  const rect = gameWrap?.getBoundingClientRect();
+  if (!rect) return { x: clientX, y: clientY };
+  return {
+    x: (clientX - rect.left) / currentScale,
+    y: (clientY - rect.top) / currentScale,
+  };
+}
 
 function updateStickVisual(dx, dy) {
   if (!touchStick) return;
@@ -188,9 +230,14 @@ if (touchJoystick) {
     event.preventDefault();
     joystickPointerId = event.pointerId;
     const rect = touchJoystick.getBoundingClientRect();
-    joystickCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-    const dx = event.clientX - joystickCenter.x;
-    const dy = event.clientY - joystickCenter.y;
+    const centerScreen = {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+    joystickCenter = screenToGame(centerScreen.x, centerScreen.y);
+    const pos = screenToGame(event.clientX, event.clientY);
+    const dx = pos.x - joystickCenter.x;
+    const dy = pos.y - joystickCenter.y;
     const dir = toDirection(dx, dy, 12);
     touchState.dir = { ...dir, active: true };
     updateStickVisual(dir.x * joystickRadius, dir.y * joystickRadius);
@@ -199,8 +246,9 @@ if (touchJoystick) {
   touchJoystick.addEventListener('pointermove', (event) => {
     if (joystickPointerId !== event.pointerId) return;
     event.preventDefault();
-    const dx = event.clientX - joystickCenter.x;
-    const dy = event.clientY - joystickCenter.y;
+    const pos = screenToGame(event.clientX, event.clientY);
+    const dx = pos.x - joystickCenter.x;
+    const dy = pos.y - joystickCenter.y;
     const dir = toDirection(dx, dy, 12);
     touchState.dir = { ...dir, active: true };
     updateStickVisual(dir.x * joystickRadius, dir.y * joystickRadius);
@@ -255,6 +303,33 @@ if (mobileStart) {
     game.startLevel(1);
     game.state = 'play';
     audio.playSfx('ui');
+    updateMobileUi();
+  });
+}
+
+if (mobileRetry) {
+  mobileRetry.addEventListener('click', () => {
+    if (game.state !== 'fail') return;
+    game.startLevel(game.levelIndex);
+    game.state = 'play';
+    audio.playSfx('ui');
+    updateMobileUi();
+  });
+}
+
+if (mobileNext) {
+  mobileNext.addEventListener('click', () => {
+    if (game.state === 'complete') {
+      game.state = 'title';
+      audio.playSfx('ui');
+      updateMobileUi();
+      return;
+    }
+    if (game.state !== 'win') return;
+    game.startLevel(game.levelIndex + 1);
+    game.state = 'play';
+    audio.playSfx('ui');
+    updateMobileUi();
   });
 }
 
@@ -280,9 +355,7 @@ function loop(now) {
         settingsDirty = false;
       }
     }
-    if (mobileStart) {
-      mobileStart.classList.toggle('active', shouldShowTouchUI(window.innerWidth) && game.state === 'title');
-    }
+    updateMobileUi();
     lastState = game.state;
   }
 

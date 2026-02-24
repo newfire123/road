@@ -24,5 +24,7 @@
 - Right-bottom joystick, left-bottom dash/fly, right-top pause
 - Orientation change flips layout (portrait/landscape)
 - Mobile shows "开始游戏" button on title screen
-- Desktop does not show touch UI or mobile start button
+- Mobile shows "重新开始" on fail, "下一关/回到标题" on win/complete
+- Desktop does not show touch UI or mobile buttons
 - Dragging joystick does not scroll page
+- Game scales to fit screen without clipping

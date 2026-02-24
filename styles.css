@@ -15,6 +15,13 @@ body {
   justify-content: center;
 }
 
+.game-wrap {
+  width: 960px;
+  height: 540px;
+  position: relative;
+  transform-origin: top left;
+}
+
 #game {
   border: 2px solid #2b2f3a;
   background: #1a1d26;

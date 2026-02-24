@@ -20,5 +20,10 @@ export function generateLevel(level) {
     dashDrainPerSec: 25,
     variableSpeedChance: Math.min(0.6, 0.15 + clamped * 0.05),
     vehicleLengthRange: [0.7, 1.3],
+    coinCount: 15,
+    coinTarget: 9,
+    coinSpread: 0.2 + clamped * 0.06,
+    reverseChance: Math.min(0.2, 0.1 + clamped * 0.01),
+    vehicleCountPerLane: Math.min(8, 5 + Math.floor(clamped / 3)),
   };
 }

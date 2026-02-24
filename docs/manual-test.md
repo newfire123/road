@@ -28,3 +28,5 @@
 - Desktop does not show touch UI or mobile buttons
 - Dragging joystick does not scroll page
 - Game scales to fit screen without clipping
+- Portrait uses ~60% scale, landscape uses ~80% scale
+- Safe-area insets prevent status bar overlap

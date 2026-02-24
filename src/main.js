@@ -1,9 +1,9 @@
 import { AudioManager } from './audio.js';
 import { Game } from './game.js';
-import { defaultSettings, loadSettings, normalizeSettings, saveSettings } from './settings.js';
+import { loadSettings, normalizeSettings, saveSettings } from './settings.js';
 import { toDirection } from './touch.js';
 import { shouldShowTouchUI } from './mobile.js';
-import { computeScale } from './scale.js';
+import { computeTargetScale } from './scale.js';
 
 const BASE_WIDTH = 960;
 const BASE_HEIGHT = 540;
@@ -149,8 +149,22 @@ const touchState = {
 game.setTouchState(touchState);
 
 let currentScale = 1;
+function getSafeArea() {
+  const style = getComputedStyle(document.body);
+  const top = parseFloat(style.paddingTop) || 0;
+  const right = parseFloat(style.paddingRight) || 0;
+  const bottom = parseFloat(style.paddingBottom) || 0;
+  const left = parseFloat(style.paddingLeft) || 0;
+  return { top, right, bottom, left };
+}
+
 function updateScale() {
-  currentScale = computeScale(window.innerWidth, window.innerHeight, BASE_WIDTH, BASE_HEIGHT);
+  const { top, right, bottom, left } = getSafeArea();
+  const availW = window.innerWidth - left - right;
+  const availH = window.innerHeight - top - bottom;
+  const isPortrait = window.innerHeight >= window.innerWidth;
+  const ratio = isPortrait ? 0.6 : 0.8;
+  currentScale = computeTargetScale(availW, availH, BASE_WIDTH, BASE_HEIGHT, ratio);
   if (gameWrap) {
     gameWrap.style.transform = `scale(${currentScale})`;
   }

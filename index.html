@@ -907,6 +907,9 @@ var CrossRoad = (() => {
   function computeScale(viewW, viewH, baseW = 960, baseH = 540) {
     return Math.min(viewW / baseW, viewH / baseH);
   }
+  function computeTargetScale(viewW, viewH, baseW = 960, baseH = 540, ratio = 1) {
+    return computeScale(viewW, viewH, baseW, baseH) * ratio;
+  }
 
   // src/main.js
   var BASE_WIDTH = 960;
@@ -1028,8 +1031,21 @@ var CrossRoad = (() => {
   };
   game.setTouchState(touchState);
   var currentScale = 1;
+  function getSafeArea() {
+    const style = getComputedStyle(document.body);
+    const top = parseFloat(style.paddingTop) || 0;
+    const right = parseFloat(style.paddingRight) || 0;
+    const bottom = parseFloat(style.paddingBottom) || 0;
+    const left = parseFloat(style.paddingLeft) || 0;
+    return { top, right, bottom, left };
+  }
   function updateScale() {
-    currentScale = computeScale(window.innerWidth, window.innerHeight, BASE_WIDTH, BASE_HEIGHT);
+    const { top, right, bottom, left } = getSafeArea();
+    const availW = window.innerWidth - left - right;
+    const availH = window.innerHeight - top - bottom;
+    const isPortrait = window.innerHeight >= window.innerWidth;
+    const ratio = isPortrait ? 0.6 : 0.8;
+    currentScale = computeTargetScale(availW, availH, BASE_WIDTH, BASE_HEIGHT, ratio);
     if (gameWrap) {
       gameWrap.style.transform = `scale(${currentScale})`;
     }

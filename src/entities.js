@@ -1,4 +1,5 @@
 export function updateVehicle(vehicle, dt, width) {
+  maybeReverseVehicle(vehicle, dt, vehicle.reverseChance ?? 0);
   if (vehicle.variable) {
     vehicle.phaseTime += dt;
     const duration = vehicle.phase === 'fast' ? vehicle.fastDuration : vehicle.slowDuration;
@@ -14,5 +15,14 @@ export function updateVehicle(vehicle, dt, width) {
   }
   if (vehicle.dir === -1 && vehicle.x + vehicle.w < 0) {
     vehicle.x = width;
+  }
+}
+
+export function maybeReverseVehicle(vehicle, dt, chance) {
+  vehicle.reverseCooldown = Math.max(0, (vehicle.reverseCooldown ?? 0) - dt);
+  if (vehicle.reverseCooldown > 0) return;
+  if (Math.random() < chance) {
+    vehicle.dir *= -1;
+    vehicle.reverseCooldown = 3 + Math.random() * 2;
   }
 }

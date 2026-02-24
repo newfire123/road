@@ -13,3 +13,7 @@ export function collectCoin(current, target, coin, canCollect) {
   coin.collected = true;
   return current + 1;
 }
+
+export function canWin(coinCount, target, playerY, roadTop, playerH) {
+  return coinCount >= target && playerY <= roadTop - playerH / 2;
+}

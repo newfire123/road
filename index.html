@@ -1066,7 +1066,7 @@ var CrossRoad = (() => {
     const availW = vp.width - left - right;
     const availH = vp.height - top - bottom;
     const isPortrait = vp.height >= vp.width;
-    const ratio = isPortrait ? 0.6 : 0.8;
+    const ratio = isPortrait ? 0.7 : 0.9;
     currentScale = computeTargetScale(availW, availH, BASE_WIDTH, BASE_HEIGHT, ratio);
     if (!Number.isFinite(currentScale) || currentScale <= 0) {
       currentScale = 1;

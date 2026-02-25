@@ -832,6 +832,19 @@ var CrossRoad = (() => {
   var ctx = canvas.getContext("2d");
   var game = new Game(canvas, ctx);
   var gameWrap = document.getElementById("game-wrap");
+  var debugOverlay = document.createElement("div");
+  debugOverlay.style.position = "absolute";
+  debugOverlay.style.left = "8px";
+  debugOverlay.style.top = "8px";
+  debugOverlay.style.padding = "6px 8px";
+  debugOverlay.style.background = "rgba(0,0,0,0.6)";
+  debugOverlay.style.color = "#aef";
+  debugOverlay.style.fontSize = "10px";
+  debugOverlay.style.zIndex = "10";
+  debugOverlay.style.whiteSpace = "pre";
+  debugOverlay.style.pointerEvents = "none";
+  debugOverlay.style.display = "none";
+  document.body.appendChild(debugOverlay);
   var settings = loadSettings(localStorage);
   game.setSettings(settings);
   var audio = new AudioManager(
@@ -962,6 +975,17 @@ var CrossRoad = (() => {
     currentScale = computeTargetScale(availW, availH, BASE_WIDTH, BASE_HEIGHT, ratio);
     if (gameWrap) {
       gameWrap.style.transform = `scale(${currentScale})`;
+      gameWrap.style.transformOrigin = "top left";
+    }
+    if (settings?.debugAudio) {
+      const rect = gameWrap?.getBoundingClientRect();
+      debugOverlay.style.display = "block";
+      debugOverlay.textContent = `inner: ${window.innerWidth}x${window.innerHeight}
+safe: t${top} r${right} b${bottom} l${left}
+scale: ${currentScale.toFixed(3)}
+wrap: ${rect ? `${rect.x.toFixed(1)},${rect.y.toFixed(1)} ${rect.width.toFixed(1)}x${rect.height.toFixed(1)}` : "n/a"}`;
+    } else {
+      debugOverlay.style.display = "none";
     }
   }
   function applyOrientationClass() {

@@ -12,6 +12,19 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const game = new Game(canvas, ctx);
 const gameWrap = document.getElementById('game-wrap');
+const debugOverlay = document.createElement('div');
+debugOverlay.style.position = 'absolute';
+debugOverlay.style.left = '8px';
+debugOverlay.style.top = '8px';
+debugOverlay.style.padding = '6px 8px';
+debugOverlay.style.background = 'rgba(0,0,0,0.6)';
+debugOverlay.style.color = '#aef';
+debugOverlay.style.fontSize = '10px';
+debugOverlay.style.zIndex = '10';
+debugOverlay.style.whiteSpace = 'pre';
+debugOverlay.style.pointerEvents = 'none';
+debugOverlay.style.display = 'none';
+document.body.appendChild(debugOverlay);
 
 let settings = loadSettings(localStorage);
 
@@ -167,6 +180,18 @@ function updateScale() {
   currentScale = computeTargetScale(availW, availH, BASE_WIDTH, BASE_HEIGHT, ratio);
   if (gameWrap) {
     gameWrap.style.transform = `scale(${currentScale})`;
+    gameWrap.style.transformOrigin = 'top left';
+  }
+
+  if (settings?.debugAudio) {
+    const rect = gameWrap?.getBoundingClientRect();
+    debugOverlay.style.display = 'block';
+    debugOverlay.textContent = `inner: ${window.innerWidth}x${window.innerHeight}\n` +
+      `safe: t${top} r${right} b${bottom} l${left}\n` +
+      `scale: ${currentScale.toFixed(3)}\n` +
+      `wrap: ${rect ? `${rect.x.toFixed(1)},${rect.y.toFixed(1)} ${rect.width.toFixed(1)}x${rect.height.toFixed(1)}` : 'n/a'}`;
+  } else {
+    debugOverlay.style.display = 'none';
   }
 }
 

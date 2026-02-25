@@ -13,6 +13,8 @@ const ctx = canvas.getContext('2d');
 const game = new Game(canvas, ctx);
 const gameWrap = document.getElementById('game-wrap');
 const debugOverlay = document.createElement('div');
+const debugEnabled = new URLSearchParams(window.location.search).has('debug');
+debugOverlay.className = 'debug-overlay';
 debugOverlay.style.position = 'absolute';
 debugOverlay.style.left = '8px';
 debugOverlay.style.top = '8px';
@@ -23,7 +25,7 @@ debugOverlay.style.fontSize = '10px';
 debugOverlay.style.zIndex = '10';
 debugOverlay.style.whiteSpace = 'pre';
 debugOverlay.style.pointerEvents = 'none';
-debugOverlay.style.display = 'block';
+debugOverlay.style.display = debugEnabled ? 'block' : 'none';
 document.body.appendChild(debugOverlay);
 
 let settings = loadSettings(localStorage);

@@ -833,6 +833,8 @@ var CrossRoad = (() => {
   var game = new Game(canvas, ctx);
   var gameWrap = document.getElementById("game-wrap");
   var debugOverlay = document.createElement("div");
+  var debugEnabled = new URLSearchParams(window.location.search).has("debug");
+  debugOverlay.className = "debug-overlay";
   debugOverlay.style.position = "absolute";
   debugOverlay.style.left = "8px";
   debugOverlay.style.top = "8px";
@@ -843,7 +845,7 @@ var CrossRoad = (() => {
   debugOverlay.style.zIndex = "10";
   debugOverlay.style.whiteSpace = "pre";
   debugOverlay.style.pointerEvents = "none";
-  debugOverlay.style.display = "block";
+  debugOverlay.style.display = debugEnabled ? "block" : "none";
   document.body.appendChild(debugOverlay);
   var settings = loadSettings(localStorage);
   game.setSettings(settings);

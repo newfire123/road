@@ -974,7 +974,11 @@ var CrossRoad = (() => {
     const ratio = isPortrait ? 0.6 : 0.8;
     currentScale = computeTargetScale(availW, availH, BASE_WIDTH, BASE_HEIGHT, ratio);
     if (gameWrap) {
-      gameWrap.style.transform = `scale(${currentScale})`;
+      const scaledW = BASE_WIDTH * currentScale;
+      const scaledH = BASE_HEIGHT * currentScale;
+      const offsetX = (availW - scaledW) / 2 + left;
+      const offsetY = (availH - scaledH) / 2 + top;
+      gameWrap.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${currentScale})`;
       gameWrap.style.transformOrigin = "top left";
     }
     if (settings?.debugAudio) {

@@ -21,7 +21,9 @@ body {
 .game-wrap {
   width: 960px;
   height: 540px;
-  position: relative;
+  position: absolute;
+  left: 50%;
+  top: 50%;
   transform-origin: top left;
 }
 

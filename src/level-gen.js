@@ -1,3 +1,5 @@
+import { computeCoinSpread } from './coins.js';
+
 export function buildLevelConfig(level) {
   const clamped = Math.max(1, Math.min(level, 9));
   const baseSpeed = 60 + clamped * 12;
@@ -15,6 +17,7 @@ export function buildLevelConfig(level) {
     lengthRange: [Number(lengthMin.toFixed(2)), Number(lengthMax.toFixed(2))],
     reverseChance: Math.min(0.2, 0.1 + clamped * 0.01),
     variableSpeedChance: Math.min(0.6, 0.15 + clamped * 0.05),
+    coinSpread: computeCoinSpread(clamped),
   };
 }
 
@@ -43,7 +46,7 @@ export function generateLevel(level) {
     vehicleLengthRange: config.lengthRange,
     coinCount: 15,
     coinTarget: 9,
-    coinSpread: 0.2 + clamped * 0.06,
+    coinSpread: config.coinSpread,
     reverseChance: config.reverseChance,
     vehicleCountPerLane: Math.min(config.vehicleCountMax, 5 + Math.floor(clamped / 3)),
     speedRange: config.speedRange,

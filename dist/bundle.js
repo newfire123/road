@@ -981,7 +981,9 @@ var CrossRoad = (() => {
       const scaledH = BASE_HEIGHT * currentScale;
       const offsetX = (availW - scaledW) / 2 + left;
       const offsetY = (availH - scaledH) / 2 + top;
-      gameWrap.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${currentScale})`;
+      gameWrap.style.left = `${offsetX}px`;
+      gameWrap.style.top = `${offsetY}px`;
+      gameWrap.style.transform = `scale(${currentScale})`;
       gameWrap.style.transformOrigin = "top left";
     }
     const rect = gameWrap?.getBoundingClientRect();

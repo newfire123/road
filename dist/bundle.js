@@ -333,6 +333,38 @@ var CrossRoad = (() => {
     drawPixelRect(ctx2, x - 1, y - 1, 2, 2, "#fff2a6");
   }
 
+  // src/sprites.js
+  var SPRITES = {
+    cars: {
+      car_1: "assets/sprites/car_1.png",
+      car_2: "assets/sprites/car_2.png",
+      car_3: "assets/sprites/car_3.png",
+      car_4: "assets/sprites/car_4.png"
+    },
+    bat: "assets/sprites/bat.png"
+  };
+  var cache = /* @__PURE__ */ new Map();
+  function getSpriteForEntity(entity) {
+    if (!entity) return null;
+    if (entity.type === "vehicle") {
+      const key = entity.spriteKey && SPRITES.cars[entity.spriteKey] ? entity.spriteKey : "car_1";
+      return { src: SPRITES.cars[key] };
+    }
+    if (entity.type === "airMonster") {
+      return { src: SPRITES.bat };
+    }
+    return null;
+  }
+  function resolveSprite(sprite) {
+    if (!sprite?.src) return null;
+    if (cache.has(sprite.src)) return cache.get(sprite.src);
+    const ImageCtor = typeof Image !== "undefined" ? Image : null;
+    const img = ImageCtor ? new ImageCtor() : { src: "" };
+    img.src = sprite.src;
+    cache.set(sprite.src, img);
+    return img;
+  }
+
   // src/settings.js
   var defaultSettings = {
     masterVolume: 0.8,
@@ -517,7 +549,8 @@ var CrossRoad = (() => {
             phaseTime: Math.random() * 1.5,
             reverseChance: this.settings.reverseChance,
             reverseCooldown: 1 + Math.random() * 2,
-            color: lane.direction === 1 ? "#f8575d" : "#4bc0ff"
+            color: lane.direction === 1 ? "#f8575d" : "#4bc0ff",
+            spriteKey: `car_${v % 4 + 1}`
           };
         });
       });
@@ -769,8 +802,22 @@ var CrossRoad = (() => {
       }
       for (const vehicle of this.vehicles) {
         const bodyColor = vehicle.variable ? vehicle.phase === "fast" ? "#ff8c61" : vehicle.color : vehicle.color;
-        drawPixelRect(this.ctx, vehicle.x, vehicle.y, vehicle.w, vehicle.h, bodyColor);
-        drawPixelRect(this.ctx, vehicle.x + 4, vehicle.y + 4, 6, 6, "#ffe57a");
+        const sprite = getSpriteForEntity({ type: "vehicle", spriteKey: vehicle.spriteKey });
+        const img = resolveSprite(sprite);
+        if (img && img.complete) {
+          this.ctx.save();
+          if (vehicle.dir === -1) {
+            this.ctx.translate(vehicle.x + vehicle.w, vehicle.y);
+            this.ctx.scale(-1, 1);
+            this.ctx.drawImage(img, 0, 0, vehicle.w, vehicle.h);
+          } else {
+            this.ctx.drawImage(img, vehicle.x, vehicle.y, vehicle.w, vehicle.h);
+          }
+          this.ctx.restore();
+        } else {
+          drawPixelRect(this.ctx, vehicle.x, vehicle.y, vehicle.w, vehicle.h, bodyColor);
+          drawPixelRect(this.ctx, vehicle.x + 4, vehicle.y + 4, 6, 6, "#ffe57a");
+        }
       }
       for (const monster of this.groundMonsters) {
         drawPixelRect(this.ctx, monster.x, monster.y, monster.w, monster.h, "#2cc38a");
@@ -782,8 +829,14 @@ var CrossRoad = (() => {
       }
       for (const monster of this.airMonsters) {
         if (!monster.active) continue;
-        drawPixelRect(this.ctx, monster.x, monster.y, monster.w, monster.h, "#4d7cff");
-        drawPixelRect(this.ctx, monster.x + 2, monster.y + 2, 4, 4, "#a4c2ff");
+        const sprite = getSpriteForEntity({ type: "airMonster" });
+        const img = resolveSprite(sprite);
+        if (img && img.complete) {
+          this.ctx.drawImage(img, monster.x, monster.y, monster.w, monster.h);
+        } else {
+          drawPixelRect(this.ctx, monster.x, monster.y, monster.w, monster.h, "#4d7cff");
+          drawPixelRect(this.ctx, monster.x + 2, monster.y + 2, 4, 4, "#a4c2ff");
+        }
       }
       for (const coin of this.coins) {
         if (coin.collected) continue;

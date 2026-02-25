@@ -117,6 +117,8 @@ body {
   pointer-events: none;
   z-index: 3;
   display: none;
+  --touch-gap: 16px;
+  --touch-gap-wide: 24px;
 }
 
 .debug-overlay {
@@ -178,33 +180,33 @@ body {
 }
 
 .touch-ui.portrait .touch-joystick {
-  right: 18px;
-  bottom: 18px;
+  right: calc(var(--touch-gap) + env(safe-area-inset-right));
+  bottom: calc(var(--touch-gap) + env(safe-area-inset-bottom));
 }
 
 .touch-ui.portrait .touch-actions {
-  left: 18px;
-  bottom: 18px;
+  left: calc(var(--touch-gap) + env(safe-area-inset-left));
+  bottom: calc(var(--touch-gap) + env(safe-area-inset-bottom));
 }
 
 .touch-ui.portrait .touch-btn.pause {
-  right: 18px;
-  top: 18px;
+  right: calc(var(--touch-gap) + env(safe-area-inset-right));
+  top: calc(var(--touch-gap) + env(safe-area-inset-top));
   position: absolute;
 }
 
 .touch-ui.landscape .touch-joystick {
-  right: 26px;
-  bottom: 26px;
+  right: calc(var(--touch-gap-wide) + env(safe-area-inset-right));
+  bottom: calc(var(--touch-gap-wide) + env(safe-area-inset-bottom));
 }
 
 .touch-ui.landscape .touch-actions {
-  left: 26px;
-  bottom: 26px;
+  left: calc(var(--touch-gap-wide) + env(safe-area-inset-left));
+  bottom: calc(var(--touch-gap-wide) + env(safe-area-inset-bottom));
 }
 
 .touch-ui.landscape .touch-btn.pause {
-  right: 26px;
-  top: 18px;
+  right: calc(var(--touch-gap-wide) + env(safe-area-inset-right));
+  top: calc(var(--touch-gap) + env(safe-area-inset-top));
   position: absolute;
 }

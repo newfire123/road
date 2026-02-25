@@ -8,6 +8,16 @@ import { computeTargetScale } from './scale.js';
 const BASE_WIDTH = 960;
 const BASE_HEIGHT = 540;
 
+export function getViewportBox(env = window) {
+  const vv = env.visualViewport;
+  const width = vv?.width ?? env.innerWidth;
+  const height = vv?.height ?? env.innerHeight;
+  const offsetLeft = vv?.offsetLeft ?? 0;
+  const offsetTop = vv?.offsetTop ?? 0;
+  return { width, height, offsetLeft, offsetTop };
+}
+
+if (typeof document !== 'undefined') {
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const game = new Game(canvas, ctx);
@@ -171,15 +181,6 @@ function getSafeArea() {
   const bottom = parseFloat(style.paddingBottom) || 0;
   const left = parseFloat(style.paddingLeft) || 0;
   return { top, right, bottom, left };
-}
-
-function getViewportBox() {
-  const vv = window.visualViewport;
-  const width = vv?.width ?? window.innerWidth;
-  const height = vv?.height ?? window.innerHeight;
-  const offsetLeft = vv?.offsetLeft ?? 0;
-  const offsetTop = vv?.offsetTop ?? 0;
-  return { width, height, offsetLeft, offsetTop };
 }
 
 function updateScale() {
@@ -433,3 +434,4 @@ function loop(now) {
 }
 
 requestAnimationFrame(loop);
+}

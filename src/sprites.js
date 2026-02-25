@@ -1,5 +1,11 @@
 export function getSpriteForEntity(entity) {
   if (entity.type === 'vehicle') {
+    if (entity.color === '#4bc0ff') {
+      return { src: 'assets/sprites/car_blue.png' };
+    }
+    if (entity.color === '#ff8c61') {
+      return { src: 'assets/sprites/car_yellow.png' };
+    }
     return { src: 'assets/sprites/car_red.png' };
   }
   if (entity.type === 'airMonster') {

@@ -4,9 +4,18 @@ import { createPlayer, toggleFlight, tryStartDash, updateDash, updateStamina } f
 import { inputVector } from './input.js';
 import { updateVehicle } from './entities.js';
 import { aabbIntersects } from './collision.js';
-import { clearScreen, drawCoin, drawDashBar, drawPixelRect, drawStaminaBar, drawText } from './renderer.js';
+import {
+  clearScreen,
+  drawCoin,
+  drawDashBar,
+  drawPixelRect,
+  drawSprite,
+  drawStaminaBar,
+  drawText,
+} from './renderer.js';
 import { normalizeSettings } from './settings.js';
 import { mergeInput } from './touch.js';
+import { getSpriteForEntity, resolveSprite } from './sprites.js';
 
 const SAFE_ZONE_HEIGHT = 60;
 const AIR_MONSTER_SIZE = 16;
@@ -417,8 +426,21 @@ export class Game {
           ? '#ff8c61'
           : vehicle.color
         : vehicle.color;
-      drawPixelRect(this.ctx, vehicle.x, vehicle.y, vehicle.w, vehicle.h, bodyColor);
-      drawPixelRect(this.ctx, vehicle.x + 4, vehicle.y + 4, 6, 6, '#ffe57a');
+      const vehicleSprite = getSpriteForEntity({ type: 'vehicle', color: bodyColor });
+      const vehicleImage = resolveSprite(vehicleSprite);
+      const drewVehicle = drawSprite(
+        this.ctx,
+        vehicle.x,
+        vehicle.y,
+        vehicle.w,
+        vehicle.h,
+        vehicleImage,
+        vehicle.dir === -1
+      );
+      if (!drewVehicle) {
+        drawPixelRect(this.ctx, vehicle.x, vehicle.y, vehicle.w, vehicle.h, bodyColor);
+        drawPixelRect(this.ctx, vehicle.x + 4, vehicle.y + 4, 6, 6, '#ffe57a');
+      }
     }
 
     for (const monster of this.groundMonsters) {
@@ -433,8 +455,13 @@ export class Game {
 
     for (const monster of this.airMonsters) {
       if (!monster.active) continue;
-      drawPixelRect(this.ctx, monster.x, monster.y, monster.w, monster.h, '#4d7cff');
-      drawPixelRect(this.ctx, monster.x + 2, monster.y + 2, 4, 4, '#a4c2ff');
+      const monsterSprite = getSpriteForEntity({ type: 'airMonster' });
+      const monsterImage = resolveSprite(monsterSprite);
+      const drewMonster = drawSprite(this.ctx, monster.x, monster.y, monster.w, monster.h, monsterImage);
+      if (!drewMonster) {
+        drawPixelRect(this.ctx, monster.x, monster.y, monster.w, monster.h, '#4d7cff');
+        drawPixelRect(this.ctx, monster.x + 2, monster.y + 2, 4, 4, '#a4c2ff');
+      }
     }
 
     for (const coin of this.coins) {

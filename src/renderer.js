@@ -34,3 +34,24 @@ export function drawCoin(ctx, x, y, r) {
   drawPixelRect(ctx, x - r + 2, y - r + 2, r * 2 - 4, r * 2 - 4, '#e2b93f');
   drawPixelRect(ctx, x - 1, y - 1, 2, 2, '#fff2a6');
 }
+
+export function drawSprite(ctx, x, y, w, h, image, flipX = false) {
+  const isLoaded =
+    image &&
+    typeof image.naturalWidth === 'number' &&
+    image.naturalWidth > 0 &&
+    (typeof image.complete !== 'boolean' || image.complete);
+
+  if (!isLoaded) return false;
+
+  ctx.save();
+  if (flipX) {
+    ctx.translate(x + w, y);
+    ctx.scale(-1, 1);
+    ctx.drawImage(image, 0, 0, w, h);
+  } else {
+    ctx.drawImage(image, x, y, w, h);
+  }
+  ctx.restore();
+  return true;
+}

@@ -171,11 +171,21 @@ function getSafeArea() {
   return { top, right, bottom, left };
 }
 
+function getViewportBox() {
+  const vv = window.visualViewport;
+  const width = vv?.width ?? window.innerWidth;
+  const height = vv?.height ?? window.innerHeight;
+  const offsetLeft = vv?.offsetLeft ?? 0;
+  const offsetTop = vv?.offsetTop ?? 0;
+  return { width, height, offsetLeft, offsetTop };
+}
+
 function updateScale() {
   const { top, right, bottom, left } = getSafeArea();
-  const availW = window.innerWidth - left - right;
-  const availH = window.innerHeight - top - bottom;
-  const isPortrait = window.innerHeight >= window.innerWidth;
+  const vp = getViewportBox();
+  const availW = vp.width - left - right;
+  const availH = vp.height - top - bottom;
+  const isPortrait = vp.height >= vp.width;
   const ratio = isPortrait ? 0.6 : 0.8;
   currentScale = computeTargetScale(availW, availH, BASE_WIDTH, BASE_HEIGHT, ratio);
   if (!Number.isFinite(currentScale) || currentScale <= 0) {
@@ -184,8 +194,8 @@ function updateScale() {
   if (gameWrap) {
     const scaledW = BASE_WIDTH * currentScale;
     const scaledH = BASE_HEIGHT * currentScale;
-    const offsetX = (availW - scaledW) / 2 + left;
-    const offsetY = (availH - scaledH) / 2 + top;
+    const offsetX = (availW - scaledW) / 2 + left + vp.offsetLeft;
+    const offsetY = (availH - scaledH) / 2 + top + vp.offsetTop;
     gameWrap.style.left = `${offsetX}px`;
     gameWrap.style.top = `${offsetY}px`;
     gameWrap.style.transform = `scale(${currentScale})`;
@@ -193,8 +203,15 @@ function updateScale() {
   }
 
   const rect = gameWrap?.getBoundingClientRect();
+  const docEl = document.documentElement;
+  const vvText = window.visualViewport
+    ? `vv: ${window.visualViewport.width.toFixed(0)}x${window.visualViewport.height.toFixed(0)} ` +
+        `off ${window.visualViewport.offsetLeft.toFixed(1)},${window.visualViewport.offsetTop.toFixed(1)}`
+    : 'vv: n/a';
   debugOverlay.textContent =
     `inner: ${window.innerWidth}x${window.innerHeight}\n` +
+    `client: ${docEl.clientWidth}x${docEl.clientHeight}\n` +
+    `${vvText}\n` +
     `safe: t${top} r${right} b${bottom} l${left}\n` +
     `ratio: ${ratio}\n` +
     `scale: ${currentScale.toFixed(3)}\n` +

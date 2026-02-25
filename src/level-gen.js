@@ -1,7 +1,31 @@
-export function generateLevel(level) {
+import { computeCoinSpread } from './coins.js';
+
+export function buildLevelConfig(level) {
   const clamped = Math.max(1, Math.min(level, 9));
-  const laneCount = 3 + clamped;
   const baseSpeed = 60 + clamped * 12;
+  const variance = 0.12 + clamped * 0.015;
+  const speedRange = [baseSpeed * (1 - variance), baseSpeed * (1 + variance)];
+  const vehicleCountMax = Math.min(10, 5 + Math.floor(clamped / 2));
+  const lengthMin = 0.6 + clamped * 0.01;
+  const lengthMax = 1.1 + clamped * 0.05;
+
+  return {
+    clamped,
+    baseSpeed,
+    speedRange,
+    vehicleCountMax,
+    lengthRange: [Number(lengthMin.toFixed(2)), Number(lengthMax.toFixed(2))],
+    reverseChance: Math.min(0.2, 0.1 + clamped * 0.01),
+    variableSpeedChance: Math.min(0.6, 0.15 + clamped * 0.05),
+    coinSpread: computeCoinSpread(clamped),
+  };
+}
+
+export function generateLevel(level) {
+  const config = buildLevelConfig(level);
+  const clamped = config.clamped;
+  const laneCount = 3 + clamped;
+  const baseSpeed = config.baseSpeed;
 
   const lanes = Array.from({ length: laneCount }, (_, i) => ({
     index: i,
@@ -18,12 +42,14 @@ export function generateLevel(level) {
     staminaRegenPerSec: 10,
     flyDrainPerSec: 20,
     dashDrainPerSec: 25,
-    variableSpeedChance: Math.min(0.6, 0.15 + clamped * 0.05),
-    vehicleLengthRange: [0.7, 1.3],
+    variableSpeedChance: config.variableSpeedChance,
+    vehicleLengthRange: config.lengthRange,
     coinCount: 15,
     coinTarget: 9,
-    coinSpread: 0.2 + clamped * 0.06,
-    reverseChance: Math.min(0.2, 0.1 + clamped * 0.01),
-    vehicleCountPerLane: Math.min(8, 5 + Math.floor(clamped / 3)),
+    coinSpread: config.coinSpread,
+    reverseChance: config.reverseChance,
+    vehicleCountPerLane: Math.min(config.vehicleCountMax, 5 + Math.floor(clamped / 3)),
+    speedRange: config.speedRange,
+    vehicleCountMax: config.vehicleCountMax,
   };
 }

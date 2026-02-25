@@ -6,6 +6,11 @@ export function shouldCollectCoin(player, coin) {
   return aabbIntersects(player, box);
 }
 
+export function computeCoinSpread(level) {
+  const clamped = Math.max(1, Math.min(level, 9));
+  return 0.2 + clamped * 0.06;
+}
+
 export function collectCoin(current, target, coin, canCollect) {
   if (!canCollect) return current;
   if (coin.collected) return current;

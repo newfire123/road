@@ -1,28 +1,33 @@
+const SPRITES = {
+  cars: {
+    car_1: 'assets/sprites/car_1.png',
+    car_2: 'assets/sprites/car_2.png',
+    car_3: 'assets/sprites/car_3.png',
+    car_4: 'assets/sprites/car_4.png',
+  },
+  bat: 'assets/sprites/bat.png',
+};
+
+const cache = new Map();
+
 export function getSpriteForEntity(entity) {
+  if (!entity) return null;
   if (entity.type === 'vehicle') {
-    if (entity.color === '#4bc0ff') {
-      return { src: 'assets/sprites/car_blue.png' };
-    }
-    if (entity.color === '#ff8c61') {
-      return { src: 'assets/sprites/car_yellow.png' };
-    }
-    return { src: 'assets/sprites/car_red.png' };
+    const key = entity.spriteKey && SPRITES.cars[entity.spriteKey] ? entity.spriteKey : 'car_1';
+    return { src: SPRITES.cars[key] };
   }
   if (entity.type === 'airMonster') {
-    return { src: 'assets/sprites/bat.png' };
+    return { src: SPRITES.bat };
   }
   return null;
 }
 
-const cache = new Map();
-
 export function resolveSprite(sprite) {
-  if (!sprite) return null;
+  if (!sprite?.src) return null;
   if (cache.has(sprite.src)) return cache.get(sprite.src);
-  const img = typeof Image === 'undefined' ? { src: sprite.src } : new Image();
-  if (typeof Image !== 'undefined') {
-    img.src = sprite.src;
-  }
+  const ImageCtor = typeof Image !== 'undefined' ? Image : null;
+  const img = ImageCtor ? new ImageCtor() : { src: '' };
+  img.src = sprite.src;
   cache.set(sprite.src, img);
   return img;
 }

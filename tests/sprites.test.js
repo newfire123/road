@@ -2,30 +2,29 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { getSpriteForEntity, resolveSprite } from '../src/sprites.js';
 
-test('getSpriteForEntity returns car sprites for vehicles', () => {
-  const sprite = getSpriteForEntity({ type: 'vehicle', color: 'red' });
+test('getSpriteForEntity returns a car sprite for vehicles', () => {
+  const sprite = getSpriteForEntity({ type: 'vehicle', spriteKey: 'car_1' });
   assert.ok(sprite);
-  assert.ok(sprite.src.includes('car'));
+  assert.ok(sprite.src.includes('car_1.png'));
 });
 
-test('getSpriteForEntity returns bat sprite for air monster', () => {
+test('getSpriteForEntity returns bat sprite for air monsters', () => {
   const sprite = getSpriteForEntity({ type: 'airMonster' });
   assert.ok(sprite);
-  assert.ok(sprite.src.includes('bat'));
+  assert.ok(sprite.src.includes('bat.png'));
 });
 
-test('getSpriteForEntity selects sprite by vehicle color', () => {
-  const redSprite = getSpriteForEntity({ type: 'vehicle', color: '#f8575d' });
-  const blueSprite = getSpriteForEntity({ type: 'vehicle', color: '#4bc0ff' });
-  const yellowSprite = getSpriteForEntity({ type: 'vehicle', color: '#ff8c61' });
-  assert.ok(redSprite.src.includes('car_red'));
-  assert.ok(blueSprite.src.includes('car_blue'));
-  assert.ok(yellowSprite.src.includes('car_yellow'));
-});
+test('resolveSprite caches images by src', () => {
+  global.Image = class TestImage {
+    constructor() {
+      this.src = '';
+      this.complete = false;
+    }
+  };
 
-test('resolveSprite returns cached image object for known sprite', () => {
-  const sprite = { src: 'assets/sprites/car_red.png' };
-  const result = resolveSprite(sprite);
-  assert.ok(result);
-  assert.ok(result.src.includes('car_red'));
+  const sprite = { src: 'assets/sprites/car_1.png' };
+  const first = resolveSprite(sprite);
+  const second = resolveSprite(sprite);
+  assert.equal(first, second);
+  assert.ok(first.src.includes('car_1.png'));
 });

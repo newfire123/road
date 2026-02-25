@@ -4,18 +4,10 @@ import { createPlayer, toggleFlight, tryStartDash, updateDash, updateStamina } f
 import { inputVector } from './input.js';
 import { updateVehicle } from './entities.js';
 import { aabbIntersects } from './collision.js';
-import {
-  clearScreen,
-  drawCoin,
-  drawDashBar,
-  drawPixelRect,
-  drawSprite,
-  drawStaminaBar,
-  drawText,
-} from './renderer.js';
+import { clearScreen, drawCoin, drawDashBar, drawPixelRect, drawStaminaBar, drawText } from './renderer.js';
+import { getSpriteForEntity, resolveSprite } from './sprites.js';
 import { normalizeSettings } from './settings.js';
 import { mergeInput } from './touch.js';
-import { getSpriteForEntity, resolveSprite } from './sprites.js';
 
 const SAFE_ZONE_HEIGHT = 60;
 const AIR_MONSTER_SIZE = 16;
@@ -130,6 +122,7 @@ export class Game {
           reverseChance: this.settings.reverseChance,
           reverseCooldown: 1 + Math.random() * 2,
           color: lane.direction === 1 ? '#f8575d' : '#4bc0ff',
+          spriteKey: `car_${(v % 4) + 1}`,
         };
       });
     });
@@ -426,18 +419,19 @@ export class Game {
           ? '#ff8c61'
           : vehicle.color
         : vehicle.color;
-      const vehicleSprite = getSpriteForEntity({ type: 'vehicle', color: bodyColor });
-      const vehicleImage = resolveSprite(vehicleSprite);
-      const drewVehicle = drawSprite(
-        this.ctx,
-        vehicle.x,
-        vehicle.y,
-        vehicle.w,
-        vehicle.h,
-        vehicleImage,
-        vehicle.dir === -1
-      );
-      if (!drewVehicle) {
+      const sprite = getSpriteForEntity({ type: 'vehicle', spriteKey: vehicle.spriteKey });
+      const img = resolveSprite(sprite);
+      if (img && img.complete) {
+        this.ctx.save();
+        if (vehicle.dir === -1) {
+          this.ctx.translate(vehicle.x + vehicle.w, vehicle.y);
+          this.ctx.scale(-1, 1);
+          this.ctx.drawImage(img, 0, 0, vehicle.w, vehicle.h);
+        } else {
+          this.ctx.drawImage(img, vehicle.x, vehicle.y, vehicle.w, vehicle.h);
+        }
+        this.ctx.restore();
+      } else {
         drawPixelRect(this.ctx, vehicle.x, vehicle.y, vehicle.w, vehicle.h, bodyColor);
         drawPixelRect(this.ctx, vehicle.x + 4, vehicle.y + 4, 6, 6, '#ffe57a');
       }
@@ -455,10 +449,11 @@ export class Game {
 
     for (const monster of this.airMonsters) {
       if (!monster.active) continue;
-      const monsterSprite = getSpriteForEntity({ type: 'airMonster' });
-      const monsterImage = resolveSprite(monsterSprite);
-      const drewMonster = drawSprite(this.ctx, monster.x, monster.y, monster.w, monster.h, monsterImage);
-      if (!drewMonster) {
+      const sprite = getSpriteForEntity({ type: 'airMonster' });
+      const img = resolveSprite(sprite);
+      if (img && img.complete) {
+        this.ctx.drawImage(img, monster.x, monster.y, monster.w, monster.h);
+      } else {
         drawPixelRect(this.ctx, monster.x, monster.y, monster.w, monster.h, '#4d7cff');
         drawPixelRect(this.ctx, monster.x + 2, monster.y + 2, 4, 4, '#a4c2ff');
       }

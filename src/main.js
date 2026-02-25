@@ -23,7 +23,7 @@ debugOverlay.style.fontSize = '10px';
 debugOverlay.style.zIndex = '10';
 debugOverlay.style.whiteSpace = 'pre';
 debugOverlay.style.pointerEvents = 'none';
-debugOverlay.style.display = 'none';
+debugOverlay.style.display = 'block';
 document.body.appendChild(debugOverlay);
 
 let settings = loadSettings(localStorage);
@@ -178,6 +178,9 @@ function updateScale() {
   const isPortrait = window.innerHeight >= window.innerWidth;
   const ratio = isPortrait ? 0.6 : 0.8;
   currentScale = computeTargetScale(availW, availH, BASE_WIDTH, BASE_HEIGHT, ratio);
+  if (!Number.isFinite(currentScale) || currentScale <= 0) {
+    currentScale = 1;
+  }
   if (gameWrap) {
     const scaledW = BASE_WIDTH * currentScale;
     const scaledH = BASE_HEIGHT * currentScale;
@@ -187,16 +190,13 @@ function updateScale() {
     gameWrap.style.transformOrigin = 'top left';
   }
 
-  if (settings?.debugAudio) {
-    const rect = gameWrap?.getBoundingClientRect();
-    debugOverlay.style.display = 'block';
-    debugOverlay.textContent = `inner: ${window.innerWidth}x${window.innerHeight}\n` +
-      `safe: t${top} r${right} b${bottom} l${left}\n` +
-      `scale: ${currentScale.toFixed(3)}\n` +
-      `wrap: ${rect ? `${rect.x.toFixed(1)},${rect.y.toFixed(1)} ${rect.width.toFixed(1)}x${rect.height.toFixed(1)}` : 'n/a'}`;
-  } else {
-    debugOverlay.style.display = 'none';
-  }
+  const rect = gameWrap?.getBoundingClientRect();
+  debugOverlay.textContent =
+    `inner: ${window.innerWidth}x${window.innerHeight}\n` +
+    `safe: t${top} r${right} b${bottom} l${left}\n` +
+    `ratio: ${ratio}\n` +
+    `scale: ${currentScale.toFixed(3)}\n` +
+    `wrap: ${rect ? `${rect.x.toFixed(1)},${rect.y.toFixed(1)} ${rect.width.toFixed(1)}x${rect.height.toFixed(1)}` : 'n/a'}`;
 }
 
 function applyOrientationClass() {

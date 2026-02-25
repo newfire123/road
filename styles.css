@@ -22,8 +22,8 @@ body {
   width: 960px;
   height: 540px;
   position: absolute;
-  left: 50%;
-  top: 50%;
+  left: 0;
+  top: 0;
   transform-origin: top left;
 }
 
